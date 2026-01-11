@@ -87,7 +87,7 @@ avatar: /assets/img/personal/ahmedtremo.jpg
 toc: true
 
 comments:
-  active: giscus # Enable Giscus comments
+  provider: giscus # Enable Giscus comments (Chirpy 7 uses 'provider' not 'active')
   # The active options are as follows:
   disqus:
     shortname: # fill with the Disqus shortname. › https://help.disqus.com/en/articles/1717111-what-s-a-shortname
@@ -96,13 +96,13 @@ comments:
     repo: # <gh-username>/<repo>
     issue_term: # < url | pathname | title | ...>
   # Giscus options › https://giscus.app
-  # To complete setup: 1) Enable Discussions on your repo, 2) Install giscus app, 3) Get IDs from giscus.app
   giscus:
     repo: AhmedTremo/ahmedtremo.github.io
     repo_id: R_kgDOJp3hDw
     category: General
     category_id: DIC_kwDOJp3hD84C007K
     mapping: pathname
+    strict: 0
     input_position: bottom
     lang: en
     reactions_enabled: 1
