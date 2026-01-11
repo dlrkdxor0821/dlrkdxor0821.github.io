@@ -20,10 +20,11 @@ timezone: Africa/Cairo
 
 title: Ahmed Tremo # the main title
 
-tagline: ML enthusiast # it will display as the sub-title
+tagline: Research Engineer @ Meta | ML Infrastructure
 
-description: >- # used by seo meta and the atom feed
-  AhmedTremo, Blog, Github, Machine Learning, Python
+description: >-
+  Technical blog by Ahmed Tremo, Research Engineer at Meta,
+  covering ML infrastructure, LLM serving, and distributed systems.
   
 # fill in the protocol & hostname for your site, e.g., 'https://username.github.io'
 url: "https://ahmedtremo.github.io"
