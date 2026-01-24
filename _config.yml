@@ -27,10 +27,10 @@ description: >-
   covering ML infrastructure, LLM serving, and distributed systems.
   
 # fill in the protocol & hostname for your site, e.g., 'https://username.github.io'
-url: "https://ahmedtremo.github.io"
+url: "https://tremo1.github.io"
 
 github:
-  username: ahmedtremo # change to your github username
+  username: tremo1 # change to your github username
 
 twitter:
   username: tremooo # change to your twitter username
@@ -43,7 +43,7 @@ social:
   links:
     # The first element serves as the copyright owner's link
     - https://twitter.com/tremooo # change to your twitter homepage
-    - https://github.com/ahmedtremo # change to your github homepage
+    - https://github.com/tremo1 # change to your github homepage
     # Uncomment below to add more social links
     - https://www.facebook.com/ahmed.tremo
     - https://www.linkedin.com/in/ahmedtremo
@@ -97,7 +97,7 @@ comments:
     issue_term: # < url | pathname | title | ...>
   # Giscus options › https://giscus.app
   giscus:
-    repo: AhmedTremo/ahmedtremo.github.io
+    repo: tremo1/tremo1.github.io
     repo_id: R_kgDOJp3hDw
     category: General
     category_id: DIC_kwDOJp3hD84C007K

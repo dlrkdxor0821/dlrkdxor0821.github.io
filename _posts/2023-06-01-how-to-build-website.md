@@ -125,6 +125,6 @@ ahmedtremo.com.    0    IN    A    185.199.110.153
 ahmedtremo.com.    0    IN    A    185.199.108.153
 ```
 
-Hope you found this article useful. If you have any questions, you can check my [blog's repo](https://github.com/AhmedTremo/ahmedtremo.github.io) on Github or feel free to reach out to me on [Twitter](https://twitter.com/ahmedtremo) or [LinkedIn](https://www.linkedin.com/in/ahmedtremo/).
+Hope you found this article useful. If you have any questions, you can check my [blog's repo](https://github.com/tremo1/tremo1.github.io) on Github or feel free to reach out to me on [Twitter](https://twitter.com/tremooo) or [LinkedIn](https://www.linkedin.com/in/ahmedtremo/).
 
 
