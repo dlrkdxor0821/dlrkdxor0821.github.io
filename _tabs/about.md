@@ -19,4 +19,4 @@ Summer 2019, I spent 3 months in the US as a part of culture exchange program ca
 _Me at the top of [Mount Moses](https://en.wikipedia.org/wiki/Mount_Sinai), Sinai, Egypt_
 
 
-I’m best reached through [LinkedIn](https://www.linkedin.com/in/ahmedtremo/). I’m always open to interesting conversations and collaboration.
+I'm best reached through [LinkedIn](https://www.linkedin.com/in/tremo1/). I'm always open to interesting conversations and collaboration.
