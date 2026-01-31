@@ -18,12 +18,12 @@ timezone: Africa/Cairo
 # jekyll-seo-tag settings › https://github.com/jekyll/jekyll-seo-tag/blob/master/docs/usage.md
 # ↓ --------------------------
 
-title: Ahmed Tremo # the main title
+title: Tremo Ahmed # the main title
 
 tagline: Research Engineer @ Meta | ML Infrastructure
 
 description: >-
-  Technical blog by Ahmed Tremo, Research Engineer at Meta,
+  Technical blog by Tremo Ahmed, Research Engineer at Meta,
   covering ML infrastructure, LLM serving, and distributed systems.
   
 # fill in the protocol & hostname for your site, e.g., 'https://username.github.io'
@@ -38,7 +38,7 @@ twitter:
 social:
   # Change to your full name.
   # It will be displayed as the default author of the posts and the copyright owner in the Footer
-  name: Ahmed Tremo
+  name: Tremo Ahmed
   email: ahmedtremoo@gmail.com # change to your email address
   links:
     # The first element serves as the copyright owner's link

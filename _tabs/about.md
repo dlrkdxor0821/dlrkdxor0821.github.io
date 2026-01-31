@@ -4,7 +4,7 @@ icon: fas fa-info-circle
 order: 4
 ---
 
-I'm Ahmed Tremo, a Research Engineer at [Meta](https://www.meta.com/) in London. Previously, I worked as an Applied Scientist at [Microsoft](https://www.microsoft.com/), a machine learning engineer at [Dell Technologies](https://www.dell.com/), and a data engineer at [Lumin Systems](http://excelsystems-eg.com/).
+I'm Tremo Ahmed, a Research Engineer at [Meta](https://www.meta.com/) in London. Previously, I worked as an Applied Scientist at [Microsoft](https://www.microsoft.com/), a machine learning engineer at [Dell Technologies](https://www.dell.com/), and a data engineer at [Lumin Systems](http://excelsystems-eg.com/).
 
 I graduated from The [German university in Cairo](https://www.guc.edu.eg/), with a bachelor's degree in computer engineering with an Excellent with honors grade.
 
