@@ -13,40 +13,39 @@ baseurl: ""
 lang: en
 
 # Change to your timezone › http://www.timezoneconverter.com/cgi-bin/findzone/findzone
-timezone: Africa/Cairo
+timezone: Korea (South)
 
 # jekyll-seo-tag settings › https://github.com/jekyll/jekyll-seo-tag/blob/master/docs/usage.md
 # ↓ --------------------------
 
-title: Tremo Ahmed # the main title
+title: KangTeak LEE # the main title
 
-tagline: Research Engineer @ Meta | AI Infra
+tagline: Physical AI
 
 description: >-
-  Technical blog by Tremo Ahmed, Research Engineer at Meta,
-  covering AI infra, LLM serving, and distributed systems.
+  Technical blog by KangTeak LEE
   
 # fill in the protocol & hostname for your site, e.g., 'https://username.github.io'
 url: "https://dlrkdxor0821.github.io"
 
 github:
-  username: tremo1 # change to your github username
+  username: dlrkdxor0821 # change to your github username
 
 twitter:
-  username: tremooo # change to your twitter username
+  username:  # change to your twitter username
 
 social:
   # Change to your full name.
   # It will be displayed as the default author of the posts and the copyright owner in the Footer
-  name: Tremo Ahmed
-  email: me@tremo.uk # change to your email address
+  name: KangTeakLee
+  email: dlrkdxor0821@gmail.com # change to your email address
   links:
     # The first element serves as the copyright owner's link
-    - https://twitter.com/tremooo # change to your twitter homepage
-    - https://github.com/tremo1 # change to your github homepage
+    #- https://twitter.com/tremooo # change to your twitter homepage
+    #- https://github.com/tremo1 # change to your github homepage
     # Uncomment below to add more social links
-    - https://www.facebook.com/ahmed.tremo
-    - https://www.linkedin.com/in/tremo1
+    #- https://www.facebook.com/ahmed.tremo
+    #- https://www.linkedin.com/in/tremo1
 
 google_site_verification: # fill in to your verification string
 
@@ -81,7 +80,7 @@ theme_mode: # [light|dark]
 img_cdn:
 
 # the avatar on sidebar, support local or CORS resources
-avatar: /assets/img/personal/ahmedtremo.jpg
+avatar: /assets/img/personal/nature.jpg
 
 # boolean type, the global switch for TOC in posts.
 toc: true
@@ -97,7 +96,7 @@ comments:
     issue_term: # < url | pathname | title | ...>
   # Giscus options › https://giscus.app
   giscus:
-    repo: tremo1/tremo1.github.io
+    repo: dlrkdxor0821/dlrkdxor0821.github.io
     repo_id: R_kgDOJp3hDw
     category: General
     category_id: DIC_kwDOJp3hD84C007K
