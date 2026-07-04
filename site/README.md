@@ -1,11 +1,12 @@
 # site — 개발 일지 (Next.js)
 
-마크다운으로 쓰는 개발 일지를 "일별 일지 / 프로젝트" 두 탭으로 보여주는 Next.js 사이트.
-정적 export로 빌드되어 저장소 루트(`../`)에 배포되며, GitHub Pages(`dlrkdxor0821.github.io`)가 그걸 서빙한다.
+마크다운으로 쓰는 개발 일지를 카테고리(Project/Study)별로 보여주는 Next.js 사이트.
+정적 export(`next build`)로 빌드되며, `main` push 시 GitHub Actions가 빌드해 GitHub Pages로 배포한다.
 
-## 일지 쓰기
+## 일지 쓰기 (두 가지 방법)
 
-`content/` 폴더에 `YYYY-MM-DD-제목.md` 형식으로 파일을 만들고 frontmatter를 채웁니다:
+1. **웹 에디터** — 사이트 사이드바 하단 로그인 후 글쓰기/글 관리. GitHub에 자동 커밋됨.
+2. **직접 파일 작성** — `content/` 폴더에 `YYYY-MM-DD-제목.md` 형식으로 파일을 만들고 frontmatter를 채웁니다:
 
 ```markdown
 ---
@@ -30,12 +31,8 @@ npm run dev            # http://localhost:3000
 
 ## 배포
 
-```bash
-cd site
-./scripts/publish.sh   # next build (static export) 후 결과물을 repo 루트로 복사
-```
-
-이후 루트에서 변경사항을 커밋·푸시하면 GitHub Pages에 반영됩니다.
+`main`에 push하면 `.github/workflows/deploy.yml`이 자동으로 `npm run build` 후 Pages에 배포합니다.
+별도 스크립트 불필요.
 
 ## 보안
 

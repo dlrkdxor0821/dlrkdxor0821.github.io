@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAdmin } from "./AdminContext";
 
 type Item = { slug: string; title: string; date: string; tags: string[] };
 type CategoryType = "project" | "study";
@@ -11,6 +12,21 @@ const GROUPS: { type: CategoryType; label: string }[] = [
   { type: "project", label: "PROJECT" },
   { type: "study", label: "STUDY" },
 ];
+
+function AdminFooter() {
+  const { ready, loggedIn, logout } = useAdmin();
+  if (!ready || !loggedIn) return null; // 로그인 진입은 우측 상단 버튼이 담당
+
+  return (
+    <div className="rail__admin">
+      <Link href="/manage?new=1" className="rail__admin-link">✍ 글쓰기</Link>
+      <Link href="/manage" className="rail__admin-link">🗂 글 관리</Link>
+      <button type="button" className="rail__admin-link rail__admin-link--btn" onClick={logout}>
+        로그아웃
+      </button>
+    </div>
+  );
+}
 
 export default function Sidebar({ projects }: { projects: Project[] }) {
   const pathname = usePathname() ?? "/";
@@ -29,7 +45,12 @@ export default function Sidebar({ projects }: { projects: Project[] }) {
           if (group.length === 0) return null;
           return (
             <section className="rail__section" key={type}>
-              <div className="rail__heading">{label}</div>
+              <Link
+                href={`/groups/${type}`}
+                className={"rail__heading rail__heading--link" + (pathname === `/groups/${type}` ? " is-active" : "")}
+              >
+                {label}
+              </Link>
               {group.map((p) => {
                 const isActiveCategory = pathname === `/projects/${encodeURIComponent(p.name)}`;
                 return (
@@ -47,6 +68,8 @@ export default function Sidebar({ projects }: { projects: Project[] }) {
           );
         })}
       </nav>
+
+      <AdminFooter />
     </aside>
   );
 }

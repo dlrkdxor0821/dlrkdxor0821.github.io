@@ -1,65 +1,160 @@
-function renderCallbackBody(status, content) {
-  return `<!DOCTYPE html><html><body><script>
-    const receiveMessage = (message) => {
-      window.opener.postMessage(
-        'authorization:github:${status}:${JSON.stringify(content)}',
-        message.origin
-      );
-      window.removeEventListener("message", receiveMessage, false);
-    }
-    window.addEventListener("message", receiveMessage, false);
-    window.opener.postMessage("authorizing:github", "*");
-  </script></body></html>`;
+// 사이트 관리자 편집용 인증 + GitHub 콘텐츠 CRUD API.
+// 비밀번호(ADMIN_PASSWORD)로 인증하고, GitHub 커밋은 GITHUB_PAT(Worker 시크릿)로 수행한다.
+// 토큰은 브라우저에 절대 노출되지 않는다.
+
+const REPO = "dlrkdxor0821/dlrkdxor0821.github.io";
+const BRANCH = "main";
+const DIR = "site/content";
+const GH_API = "https://api.github.com";
+
+function corsHeaders(request) {
+  const origin = request.headers.get("Origin") || "";
+  const allowed =
+    origin === "https://dlrkdxor0821.github.io" || /^http:\/\/localhost(:\d+)?$/.test(origin);
+  return {
+    "Access-Control-Allow-Origin": allowed ? origin : "https://dlrkdxor0821.github.io",
+    "Access-Control-Allow-Methods": "GET, PUT, DELETE, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "content-type, x-admin-password",
+    "Access-Control-Max-Age": "86400",
+  };
 }
 
-async function handleAuth(request, env) {
-  const url = new URL(request.url);
-  const redirectUrl = new URL("https://github.com/login/oauth/authorize");
-  redirectUrl.searchParams.set("client_id", env.GITHUB_CLIENT_ID);
-  redirectUrl.searchParams.set("redirect_uri", `${url.origin}/callback`);
-  redirectUrl.searchParams.set("scope", "repo user");
-  redirectUrl.searchParams.set("state", crypto.randomUUID());
-  return Response.redirect(redirectUrl.href, 302);
+function json(request, body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json;charset=UTF-8", ...corsHeaders(request) },
+  });
 }
 
-async function handleCallback(request, env) {
-  const url = new URL(request.url);
-  const code = url.searchParams.get("code");
+function utf8ToBase64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
 
-  const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
-    method: "POST",
+function base64ToUtf8(b64) {
+  const bin = atob(b64.replace(/\s/g, ""));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+function gh(env, path, opts = {}) {
+  return fetch(`${GH_API}${path}`, {
+    ...opts,
     headers: {
-      "content-type": "application/json",
-      accept: "application/json",
-      "user-agent": "decap-cms-oauth-worker",
+      Authorization: `Bearer ${env.GITHUB_PAT}`,
+      Accept: "application/vnd.github+json",
+      "User-Agent": "dlrkdxor0821-admin-worker",
+      ...(opts.headers || {}),
     },
-    body: JSON.stringify({
-      client_id: env.GITHUB_CLIENT_ID,
-      client_secret: env.GITHUB_CLIENT_SECRET,
-      code,
-    }),
   });
-  const result = await tokenResponse.json();
+}
 
-  const body = result.error
-    ? renderCallbackBody("error", result)
-    : renderCallbackBody("success", { token: result.access_token, provider: "github" });
+function filePath(slug) {
+  return `${DIR}/${slug}.md`;
+}
 
-  return new Response(body, {
-    status: result.error ? 401 : 200,
-    headers: { "content-type": "text/html;charset=UTF-8" },
+async function getFile(env, slug) {
+  const res = await gh(
+    env,
+    `/repos/${REPO}/contents/${encodeURI(filePath(slug))}?ref=${BRANCH}`,
+  );
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`GitHub ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  return { slug, sha: data.sha, raw: base64ToUtf8(data.content) };
+}
+
+async function listPosts(env) {
+  const res = await gh(env, `/repos/${REPO}/contents/${encodeURI(DIR)}?ref=${BRANCH}`);
+  if (!res.ok) throw new Error(`GitHub ${res.status}: ${await res.text()}`);
+  const items = await res.json();
+  const mdFiles = items.filter((it) => it.type === "file" && it.name.endsWith(".md"));
+  const posts = await Promise.all(
+    mdFiles.map((it) => getFile(env, it.name.replace(/\.md$/, ""))),
+  );
+  return posts.filter(Boolean);
+}
+
+async function putFile(env, slug, content, sha) {
+  const body = {
+    message: `${sha ? "update" : "create"}: ${slug}`,
+    content: utf8ToBase64(content),
+    branch: BRANCH,
+  };
+  if (sha) body.sha = sha;
+  const res = await gh(env, `/repos/${REPO}/contents/${encodeURI(filePath(slug))}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
   });
+  if (!res.ok) throw new Error(`GitHub ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  return data.content.sha;
+}
+
+async function deleteFile(env, slug, sha) {
+  const res = await gh(env, `/repos/${REPO}/contents/${encodeURI(filePath(slug))}`, {
+    method: "DELETE",
+    body: JSON.stringify({ message: `delete: ${slug}`, sha, branch: BRANCH }),
+  });
+  if (!res.ok) throw new Error(`GitHub ${res.status}: ${await res.text()}`);
+}
+
+function authed(request, env) {
+  return request.headers.get("x-admin-password") === env.ADMIN_PASSWORD;
 }
 
 export default {
   async fetch(request, env) {
-    const { pathname } = new URL(request.url);
+    const url = new URL(request.url);
+    const { pathname } = url;
+
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: corsHeaders(request) });
+    }
+
     try {
-      if (pathname === "/auth") return handleAuth(request, env);
-      if (pathname === "/callback") return handleCallback(request, env);
-      return new Response("Not found", { status: 404 });
+      if (pathname === "/api/login" && request.method === "POST") {
+        const { password } = await request.json().catch(() => ({}));
+        if (password !== env.ADMIN_PASSWORD) return json(request, { error: "wrong password" }, 401);
+        return json(request, { ok: true });
+      }
+
+      // 이하 모든 엔드포인트는 인증 필요
+      if (pathname.startsWith("/api/posts")) {
+        if (!authed(request, env)) return json(request, { error: "unauthorized" }, 401);
+
+        // /api/posts
+        if (pathname === "/api/posts") {
+          if (request.method === "GET") return json(request, await listPosts(env));
+        }
+
+        // /api/posts/:slug
+        const m = pathname.match(/^\/api\/posts\/(.+)$/);
+        if (m) {
+          const slug = decodeURIComponent(m[1]);
+          if (request.method === "GET") {
+            const post = await getFile(env, slug);
+            return post ? json(request, post) : json(request, { error: "not found" }, 404);
+          }
+          if (request.method === "PUT") {
+            const { content, sha } = await request.json();
+            const newSha = await putFile(env, slug, content, sha);
+            return json(request, { sha: newSha });
+          }
+          if (request.method === "DELETE") {
+            const sha = url.searchParams.get("sha");
+            await deleteFile(env, slug, sha);
+            return json(request, { ok: true });
+          }
+        }
+      }
+
+      return json(request, { error: "not found" }, 404);
     } catch (error) {
-      return new Response(error.message, { status: 500 });
+      return json(request, { error: error.message }, 500);
     }
   },
 };

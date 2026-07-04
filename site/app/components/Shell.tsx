@@ -5,6 +5,7 @@ import Sidebar from "./Sidebar";
 import ThemeToggle from "./ThemeToggle";
 import SearchButton from "./SearchButton";
 import AdminButton from "./AdminButton";
+import { AdminProvider } from "./AdminContext";
 
 type Item = { slug: string; title: string; date: string; tags: string[] };
 type CategoryType = "project" | "study";
@@ -34,22 +35,24 @@ export default function Shell({
     });
 
   return (
-    <div className={"shell" + (collapsed ? " shell--collapsed" : "")}>
-      <button
-        type="button"
-        className="rail-toggle"
-        onClick={toggle}
-        aria-label={collapsed ? "사이드패널 열기" : "사이드패널 접기"}
-        aria-expanded={!collapsed}
-        title={collapsed ? "패널 열기" : "패널 접기"}
-      >
-        <span aria-hidden="true">{collapsed ? "»" : "«"}</span>
-      </button>
-      <AdminButton />
-      <SearchButton />
-      <ThemeToggle />
-      <Sidebar projects={projects} />
-      <main className="stage">{children}</main>
-    </div>
+    <AdminProvider>
+      <div className={"shell" + (collapsed ? " shell--collapsed" : "")}>
+        <button
+          type="button"
+          className="rail-toggle"
+          onClick={toggle}
+          aria-label={collapsed ? "사이드패널 열기" : "사이드패널 접기"}
+          aria-expanded={!collapsed}
+          title={collapsed ? "패널 열기" : "패널 접기"}
+        >
+          <span aria-hidden="true">{collapsed ? "»" : "«"}</span>
+        </button>
+        <AdminButton />
+        <SearchButton />
+        <ThemeToggle />
+        <Sidebar projects={projects} />
+        <main className="stage">{children}</main>
+      </div>
+    </AdminProvider>
   );
 }
