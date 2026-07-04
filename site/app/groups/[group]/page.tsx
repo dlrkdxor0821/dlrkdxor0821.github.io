@@ -1,23 +1,26 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getProjects, CategoryType } from "@/lib/posts";
+import { getProjects, getGroups } from "@/lib/posts";
 
-const LABELS: Record<CategoryType, string> = { project: "프로젝트", study: "스터디" };
+export const dynamicParams = false;
 
 export function generateStaticParams() {
-  return [{ group: "project" }, { group: "study" }];
+  // 설정된 그룹 + 글에서 실제로 쓰인 그룹
+  const configured = getGroups();
+  const used = getProjects().map((c) => c.type);
+  const all = [...configured, ...used].filter((g, i, a) => a.indexOf(g) === i);
+  return all.map((group) => ({ group }));
 }
 
 export default function GroupPage({ params }: { params: { group: string } }) {
-  const group = params.group;
-  if (group !== "project" && group !== "study") notFound();
-
+  const group = decodeURIComponent(params.group);
   const categories = getProjects().filter((c) => c.type === group && c.count > 0);
+  if (categories.length === 0 && !getGroups().includes(group)) notFound();
 
   return (
     <div className="view">
       <Link href="/" className="back">← 홈</Link>
-      <h1 className="view__title">{LABELS[group]}</h1>
+      <h1 className="view__title">{group}</h1>
 
       {categories.length === 0 ? (
         <p className="empty">이 그룹에 카테고리가 없어요.</p>

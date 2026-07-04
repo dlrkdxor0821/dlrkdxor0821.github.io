@@ -8,16 +8,17 @@ import AdminButton from "./AdminButton";
 import { AdminProvider } from "./AdminContext";
 
 type Item = { slug: string; title: string; date: string; tags: string[] };
-type CategoryType = "project" | "study";
-type Project = { name: string; type: CategoryType; logs: Item[] };
+type Project = { name: string; type: string; logs: Item[] };
 
 const STORE_KEY = "rail-collapsed";
 
 export default function Shell({
   projects,
+  groups,
   children,
 }: {
   projects: Project[];
+  groups: string[];
   children: React.ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -50,7 +51,7 @@ export default function Shell({
         <AdminButton />
         <SearchButton />
         <ThemeToggle />
-        <Sidebar projects={projects} />
+        <Sidebar projects={projects} groups={groups} />
         <main className="stage">{children}</main>
       </div>
     </AdminProvider>

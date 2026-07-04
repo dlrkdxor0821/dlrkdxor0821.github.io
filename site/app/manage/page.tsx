@@ -5,8 +5,9 @@ import { useAdmin } from "../components/AdminContext";
 import PostList, { LoadedPost } from "../components/PostList";
 import PostEditor from "../components/PostEditor";
 import CategoryManager from "../components/CategoryManager";
+import GroupManager from "../components/GroupManager";
 import { PostFields, CategoryGroup, parseMarkdown, buildMarkdown, makeSlug } from "@/lib/markdown";
-import { PROJECT_CATEGORY_NAMES } from "@/lib/adminConfig";
+import { fallbackGroup, DEFAULT_GROUPS } from "@/lib/adminConfig";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -51,8 +52,10 @@ function LoginGate() {
 export default function ManagePage() {
   const { ready, loggedIn, api } = useAdmin();
   const [posts, setPosts] = useState<LoadedPost[] | null>(null);
+  const [groups, setGroups] = useState<string[]>(DEFAULT_GROUPS);
+  const [groupsSha, setGroupsSha] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ post: LoadedPost | null; isNew: boolean } | null>(null);
-  const [managingCats, setManagingCats] = useState(false);
+  const [view, setView] = useState<"list" | "categories" | "groups">("list");
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
@@ -66,12 +69,21 @@ export default function ManagePage() {
     return loaded;
   }, [api]);
 
+  const loadGroups = useCallback(async () => {
+    const res = await api("/api/groups");
+    if (!res.ok) return;
+    const data: { groups: string[]; sha: string | null } = await res.json();
+    setGroups(data.groups);
+    setGroupsSha(data.sha);
+  }, [api]);
+
   // 로그인 후: 목록 로드 + URL 의도(new/slug) 처리
   useEffect(() => {
     if (!ready || !loggedIn) return;
     let cancelled = false;
     (async () => {
       try {
+        await loadGroups();
         const loaded = await loadPosts();
         if (cancelled) return;
         const params = new URLSearchParams(window.location.search);
@@ -91,7 +103,7 @@ export default function ManagePage() {
     return () => {
       cancelled = true;
     };
-  }, [ready, loggedIn, loadPosts]);
+  }, [ready, loggedIn, loadPosts, loadGroups]);
 
   const uniqueSlug = (base: string, existing: LoadedPost[]): string => {
     const taken = new Set(existing.map((p) => p.slug));
@@ -186,11 +198,54 @@ export default function ManagePage() {
     const map: Record<string, CategoryGroup> = {};
     for (const p of sorted) {
       if (p.fields.project in map) continue;
-      map[p.fields.project] =
-        p.fields.group ?? (PROJECT_CATEGORY_NAMES.includes(p.fields.project) ? "project" : "study");
+      map[p.fields.project] = p.fields.group ?? fallbackGroup(p.fields.project);
     }
     return map;
   }, [posts]);
+
+  // 실제로 글이 속한 그룹(삭제 불가 판정용)
+  const usedGroups = useMemo(
+    () => new Set((posts ?? []).map((p) => p.fields.group ?? fallbackGroup(p.fields.project))),
+    [posts],
+  );
+
+  // 그룹 목록 저장 + 이름변경 시 해당 그룹의 모든 글 마이그레이션
+  const handleGroupsApply = async (order: string[], renames: { from: string; to: string }[]) => {
+    setSaving(true);
+    try {
+      // 1) 이름 변경: 각 그룹의 (명시/폴백) 그룹이 from인 글을 to로
+      for (const { from, to } of renames) {
+        const affected = (posts ?? []).filter(
+          (p) => (p.fields.group ?? fallbackGroup(p.fields.project)) === from,
+        );
+        for (const p of affected) {
+          const content = buildMarkdown({ ...p.fields, group: to });
+          const res = await api(`/api/posts/${encodeURIComponent(p.slug)}`, {
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ content, sha: p.sha }),
+          });
+          if (!res.ok) throw new Error(`그룹 이름변경 실패 (${res.status})`);
+        }
+      }
+      // 2) groups.json 갱신 (순서/추가/삭제)
+      const res = await api("/api/groups", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ groups: order, sha: groupsSha }),
+      });
+      if (!res.ok) throw new Error(`그룹 저장 실패 (${res.status})`);
+      await loadGroups();
+      await loadPosts();
+      setView("list");
+      setToast("그룹 반영됐어요. 잠시 후 사이트에 적용됩니다.");
+      setTimeout(() => setToast(""), 6000);
+    } catch (e) {
+      setToast((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (!ready) return null;
   if (!loggedIn) return <LoginGate />;
@@ -208,16 +263,26 @@ export default function ManagePage() {
           isNew={editing.isNew}
           categories={categories}
           categoryGroups={categoryGroupMap}
+          groups={groups}
           saving={saving}
           onSave={handleSave}
           onCancel={() => setEditing(null)}
         />
-      ) : managingCats ? (
+      ) : view === "categories" ? (
         <CategoryManager
           posts={posts ?? []}
+          groups={groups}
           busy={saving}
           onApply={handleCategoryApply}
-          onBack={() => setManagingCats(false)}
+          onBack={() => setView("list")}
+        />
+      ) : view === "groups" ? (
+        <GroupManager
+          groups={groups}
+          usedGroups={usedGroups}
+          busy={saving}
+          onApply={handleGroupsApply}
+          onBack={() => setView("list")}
         />
       ) : loadError ? (
         <p className="empty">{loadError}</p>
@@ -229,7 +294,8 @@ export default function ManagePage() {
           onNew={() => setEditing({ post: null, isNew: true })}
           onEdit={(p) => setEditing({ post: p, isNew: false })}
           onDelete={handleDelete}
-          onManageCategories={() => setManagingCats(true)}
+          onManageCategories={() => setView("categories")}
+          onManageGroups={() => setView("groups")}
         />
       )}
     </>

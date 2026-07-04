@@ -1,25 +1,27 @@
 import Link from "next/link";
 
-type CategoryType = "project" | "study";
-type Category = { name: string; type: CategoryType; count: number };
+type Category = { name: string; type: string; count: number };
 
-const GROUPS: { type: CategoryType; label: string }[] = [
-  { type: "project", label: "PROJECT" },
-  { type: "study", label: "STUDY" },
-];
-
-export default function HomeIndex({ categories }: { categories: Category[] }) {
+export default function HomeIndex({
+  groups,
+  categories,
+}: {
+  groups: string[];
+  categories: Category[];
+}) {
   return (
     <div className="view">
       <h1 className="home__title">log</h1>
       <p className="home__sub">매일의 작업 기록. 카테고리를 골라 보세요.</p>
 
-      {GROUPS.map(({ type, label }) => {
-        const group = categories.filter((c) => c.type === type);
+      {groups.map((groupName) => {
+        const group = categories.filter((c) => c.type === groupName);
         if (group.length === 0) return null;
         return (
-          <section key={type} className="home-group">
-            <h2 className="home-group__title">{label}</h2>
+          <section key={groupName} className="home-group">
+            <Link href={`/groups/${encodeURIComponent(groupName)}`} className="home-group__title">
+              {groupName}
+            </Link>
             <ul className="plist">
               {group.map((category) => (
                 <li key={category.name}>

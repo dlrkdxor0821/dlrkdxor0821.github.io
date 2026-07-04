@@ -5,6 +5,7 @@
 const REPO = "dlrkdxor0821/dlrkdxor0821.github.io";
 const BRANCH = "main";
 const DIR = "site/content";
+const GROUPS_PATH = "site/data/groups.json";
 const GH_API = "https://api.github.com";
 
 function corsHeaders(request) {
@@ -102,6 +103,36 @@ async function deleteFile(env, slug, sha) {
   if (!res.ok) throw new Error(`GitHub ${res.status}: ${await res.text()}`);
 }
 
+async function getGroupsFile(env) {
+  const res = await gh(env, `/repos/${REPO}/contents/${encodeURI(GROUPS_PATH)}?ref=${BRANCH}`);
+  if (res.status === 404) return { groups: ["프로젝트", "스터디"], sha: null };
+  if (!res.ok) throw new Error(`GitHub ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  let groups = ["프로젝트", "스터디"];
+  try {
+    const parsed = JSON.parse(base64ToUtf8(data.content));
+    if (Array.isArray(parsed) && parsed.every((x) => typeof x === "string")) groups = parsed;
+  } catch (e) {
+    /* keep default */
+  }
+  return { groups, sha: data.sha };
+}
+
+async function putGroupsFile(env, groups, sha) {
+  const body = {
+    message: "update: groups",
+    content: utf8ToBase64(JSON.stringify(groups, null, 2) + "\n"),
+    branch: BRANCH,
+  };
+  if (sha) body.sha = sha;
+  const res = await gh(env, `/repos/${REPO}/contents/${encodeURI(GROUPS_PATH)}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`GitHub ${res.status}: ${await res.text()}`);
+  return (await res.json()).content.sha;
+}
+
 function authed(request, env) {
   return request.headers.get("x-admin-password") === env.ADMIN_PASSWORD;
 }
@@ -120,6 +151,20 @@ export default {
         const { password } = await request.json().catch(() => ({}));
         if (password !== env.ADMIN_PASSWORD) return json(request, { error: "wrong password" }, 401);
         return json(request, { ok: true });
+      }
+
+      // 그룹 목록 (site/data/groups.json)
+      if (pathname === "/api/groups") {
+        if (!authed(request, env)) return json(request, { error: "unauthorized" }, 401);
+        if (request.method === "GET") return json(request, await getGroupsFile(env));
+        if (request.method === "PUT") {
+          const { groups, sha } = await request.json();
+          if (!Array.isArray(groups) || !groups.every((x) => typeof x === "string")) {
+            return json(request, { error: "invalid groups" }, 400);
+          }
+          const newSha = await putGroupsFile(env, groups, sha);
+          return json(request, { sha: newSha });
+        }
       }
 
       // 이하 모든 엔드포인트는 인증 필요

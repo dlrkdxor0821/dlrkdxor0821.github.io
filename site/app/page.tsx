@@ -1,4 +1,4 @@
-import { getAllPosts, getProjects } from "@/lib/posts";
+import { getAllPosts, getProjects, getGroups } from "@/lib/posts";
 import HomeIndex from "./components/HomeIndex";
 
 export default function Home() {
@@ -13,6 +13,12 @@ export default function Home() {
   }
 
   const categories = getProjects().filter((c) => c.count > 0);
+  // groups.json 순서 + 설정에 없지만 실제 쓰인 그룹을 뒤에 덧붙임
+  const configured = getGroups();
+  const used = categories.map((c) => c.type);
+  const groups = [...configured, ...used.filter((g) => !configured.includes(g))].filter(
+    (g, i, a) => a.indexOf(g) === i,
+  );
 
-  return <HomeIndex categories={categories} />;
+  return <HomeIndex groups={groups} categories={categories} />;
 }

@@ -9,6 +9,7 @@ export default function PostEditor({
   isNew,
   categories,
   categoryGroups,
+  groups,
   saving,
   onSave,
   onCancel,
@@ -17,6 +18,7 @@ export default function PostEditor({
   isNew: boolean;
   categories: string[];
   categoryGroups: Record<string, CategoryGroup>; // 기존 카테고리 → 그룹
+  groups: string[]; // 선택 가능한 그룹 목록
   saving: boolean;
   onSave: (fields: PostFields) => void;
   onCancel: () => void;
@@ -24,9 +26,10 @@ export default function PostEditor({
   const [title, setTitle] = useState(initial.title);
   const [date, setDate] = useState(initial.date);
   const [project, setProject] = useState(initial.project || "기타");
-  const [group, setGroup] = useState<CategoryGroup>(
-    initial.group ?? categoryGroups[initial.project || "기타"] ?? "study",
-  );
+  const defaultGroup = initial.group ?? categoryGroups[initial.project || "기타"] ?? groups[0] ?? "스터디";
+  const [group, setGroup] = useState<CategoryGroup>(defaultGroup);
+  // 현재 group이 목록에 없으면(예전 값) 목록에 포함해 표시
+  const groupOptions = groups.includes(group) ? groups : [group, ...groups];
   const [tagsText, setTagsText] = useState(initial.tags.join(", "));
   const [body, setBody] = useState(initial.body);
   const [preview, setPreview] = useState(false);
@@ -48,7 +51,7 @@ export default function PostEditor({
     title !== initial.title ||
     date !== initial.date ||
     project !== (initial.project || "기타") ||
-    group !== (initial.group ?? categoryGroups[initial.project || "기타"] ?? "study") ||
+    group !== defaultGroup ||
     tagsText !== initial.tags.join(", ") ||
     body !== initial.body;
 
@@ -142,23 +145,14 @@ export default function PostEditor({
       </div>
 
       <div className="ed-field">
-        <label className="ed-label">분류 (대카테고리)</label>
-        <div className="ed-seg">
-          <button
-            type="button"
-            className={"ed-seg__btn" + (group === "project" ? " is-active" : "")}
-            onClick={() => setGroup("project")}
-          >
-            프로젝트
-          </button>
-          <button
-            type="button"
-            className={"ed-seg__btn" + (group === "study" ? " is-active" : "")}
-            onClick={() => setGroup("study")}
-          >
-            스터디
-          </button>
-        </div>
+        <label className="ed-label">그룹 (대분류)</label>
+        <select className="ed-input ed-select" value={group} onChange={(e) => setGroup(e.target.value)}>
+          {groupOptions.map((g) => (
+            <option key={g} value={g}>
+              {g}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="ed-field">

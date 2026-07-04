@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import path from "node:path";
-import { getAllPosts, getPostBySlug, getProjects, getPostsByProject } from "./posts";
+import { getAllPosts, getPostBySlug, getProjects, getPostsByProject, DEFAULT_GROUPS } from "./posts";
 
 const FIXTURES = path.join(__dirname, "fixtures");
 
@@ -77,11 +77,11 @@ describe("projects", () => {
     expect(rest).toEqual([...rest].sort((a, b) => a.localeCompare(b)));
   });
 
-  it("PROJECT_CATEGORIES에 있는 이름만 project로, 나머지는 study로 분류한다", () => {
+  it("group 없는 기존 글은 이름 기반 기본 그룹으로 폴백한다", () => {
     const projects = getProjects(FIXTURES);
     const arte = projects.find((p) => p.name === "Arte Project Team")!;
     const ros2 = projects.find((p) => p.name === "ROS2")!;
-    expect(arte.type).toBe("project");
-    expect(ros2.type).toBe("study");
+    expect(arte.type).toBe(DEFAULT_GROUPS[0]); // PROJECT_CATEGORIES → 첫 그룹
+    expect(ros2.type).toBe(DEFAULT_GROUPS[1]); // 나머지 → 둘째 그룹
   });
 });

@@ -770,3 +770,34 @@ a { color: inherit; text-decoration: none; }
 .catrow__seg { flex: none; }
 .catrow__seg .ed-seg__btn { padding: 6px 12px; font-size: 12.5px; }
 .catrow__count { flex: none; font-family: var(--mono); font-size: 11.5px; color: var(--text-3); }
+
+/* 드롭다운 (그룹 선택) */
+.ed-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%23948d76'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 30px;
+  cursor: pointer;
+}
+
+/* 홈/프로젝트 그룹 제목이 링크일 때 */
+a.home-group__title,
+a.plist-group__title { transition: color 0.15s ease; }
+a.home-group__title:hover,
+a.plist-group__title:hover { color: var(--accent-2); }
+
+/* 그룹 관리 */
+.grouplist { list-style: none; margin-top: 24px; display: flex; flex-direction: column; gap: 8px; }
+.grouprow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.grouprow__order { display: flex; gap: 4px; flex: none; }
+.grouprow__order .ed-btn { padding: 4px 9px; }
+.grouprow__name { flex: 1; min-width: 120px; font-size: 15px; }
+.group-add { display: flex; gap: 8px; margin-top: 20px; max-width: 420px; }
+.group-add .ed-input { flex: 1; }

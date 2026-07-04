@@ -4,25 +4,20 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-type CategoryType = "project" | "study";
-type Post = { slug: string; title: string; date: string; project: string; tags: string[]; type: CategoryType };
+type Post = { slug: string; title: string; date: string; project: string; tags: string[]; type: string };
 
 const fmt = (d: string) => d.replace(/-/g, ". ");
-const FILTERS: { value: "all" | CategoryType; label: string }[] = [
-  { value: "all", label: "전체" },
-  { value: "project", label: "Project" },
-  { value: "study", label: "Study" },
-];
 
 function matches(query: string, post: Post): boolean {
   const haystack = `${post.title} ${post.tags.join(" ")} ${post.project}`.toLowerCase();
   return haystack.includes(query);
 }
 
-export default function SearchResults({ posts }: { posts: Post[] }) {
+export default function SearchResults({ posts, groups }: { posts: Post[]; groups: string[] }) {
   const params = useSearchParams();
   const [query, setQuery] = useState(params.get("q") ?? "");
-  const [filter, setFilter] = useState<"all" | CategoryType>("all");
+  const [filter, setFilter] = useState<string>("all");
+  const filters = ["all", ...groups];
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -47,15 +42,15 @@ export default function SearchResults({ posts }: { posts: Post[] }) {
         aria-label="글 검색"
       />
 
-      <div className="home-filters" role="group" aria-label="카테고리 필터">
-        {FILTERS.map((f) => (
+      <div className="home-filters" role="group" aria-label="그룹 필터">
+        {filters.map((f) => (
           <button
-            key={f.value}
+            key={f}
             type="button"
-            className={"home-filter" + (filter === f.value ? " is-active" : "")}
-            onClick={() => setFilter(f.value)}
+            className={"home-filter" + (filter === f ? " is-active" : "")}
+            onClick={() => setFilter(f)}
           >
-            {f.label}
+            {f === "all" ? "전체" : f}
           </button>
         ))}
       </div>

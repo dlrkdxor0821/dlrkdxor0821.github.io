@@ -1,27 +1,28 @@
 import Link from "next/link";
-import { getProjects, CategoryType } from "@/lib/posts";
-
-const GROUPS: { type: CategoryType; label: string }[] = [
-  { type: "project", label: "프로젝트" },
-  { type: "study", label: "스터디" },
-];
+import { getProjects, getGroups } from "@/lib/posts";
 
 export default function ProjectsPage() {
   const projects = getProjects();
 
   if (projects.length === 0) {
-    return <p className="empty">아직 프로젝트가 없어요.</p>;
+    return <p className="empty">아직 카테고리가 없어요.</p>;
   }
+
+  const configured = getGroups();
+  const used = projects.map((p) => p.type);
+  const groups = [...configured, ...used].filter((g, i, a) => a.indexOf(g) === i);
 
   return (
     <div className="view">
-      <h1 className="view__title">프로젝트</h1>
-      {GROUPS.map(({ type, label }) => {
-        const group = projects.filter((p) => p.type === type);
+      <h1 className="view__title">전체 카테고리</h1>
+      {groups.map((groupName) => {
+        const group = projects.filter((p) => p.type === groupName && p.count > 0);
         if (group.length === 0) return null;
         return (
-          <section key={type} className="plist-group">
-            <h2 className="plist-group__title">{label}</h2>
+          <section key={groupName} className="plist-group">
+            <Link href={`/groups/${encodeURIComponent(groupName)}`} className="plist-group__title">
+              {groupName}
+            </Link>
             <ul className="plist">
               {group.map((project) => (
                 <li key={project.name}>

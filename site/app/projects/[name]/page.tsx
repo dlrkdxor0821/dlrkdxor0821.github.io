@@ -13,11 +13,11 @@ export default function ProjectPage({ params }: { params: { name: string } }) {
 
   return (
     <div className="view">
-      <Link href="/projects" className="back">← 프로젝트</Link>
+      <Link href="/projects" className="back">← 전체 카테고리</Link>
       <h1 className="view__title">{name}</h1>
 
       {posts.length === 0 ? (
-        <p className="empty">이 프로젝트의 일지가 없어요.</p>
+        <p className="empty">이 카테고리의 글이 없어요.</p>
       ) : (
         <ul className="dlist">
           {posts.map((post) => (

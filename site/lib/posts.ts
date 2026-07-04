@@ -4,16 +4,31 @@ import matter from "gray-matter";
 import { marked } from "marked";
 
 export const CONTENT_DIR = path.join(process.cwd(), "content");
+export const GROUPS_FILE = path.join(process.cwd(), "data", "groups.json");
 
-export type CategoryType = "project" | "study";
+// 그룹은 임의의 문자열 이름(예: "프로젝트", "스터디", "회고"). data/groups.json이 순서·목록의 원본.
+export type CategoryType = string;
+
+export const DEFAULT_GROUPS = ["프로젝트", "스터디"];
 
 export interface PostMeta {
   slug: string;
   title: string;
   date: string; // YYYY-MM-DD
   project: string;
-  group?: CategoryType; // frontmatter에 있으면 사용, 없으면 이름 기반 폴백
+  group?: CategoryType; // frontmatter의 group. 없으면 이름 기반 폴백.
   tags: string[];
+}
+
+// data/groups.json에서 그룹 목록(순서 포함)을 읽는다. 없거나 깨졌으면 기본값.
+export function getGroups(): string[] {
+  try {
+    const arr = JSON.parse(fs.readFileSync(GROUPS_FILE, "utf8"));
+    if (Array.isArray(arr) && arr.length && arr.every((x) => typeof x === "string")) return arr;
+  } catch {
+    /* 파일 없음/파싱 실패 → 기본값 */
+  }
+  return DEFAULT_GROUPS;
 }
 
 function formatDate(value: unknown, slug: string): string {
@@ -33,7 +48,7 @@ function readPostMeta(dir: string, filename: string): PostMeta {
   const slug = filename.replace(/\.md$/, "");
   const raw = fs.readFileSync(path.join(dir, filename), "utf8");
   const { data } = matter(raw);
-  const group = data.group === "project" || data.group === "study" ? data.group : undefined;
+  const group = typeof data.group === "string" && data.group.trim() ? data.group.trim() : undefined;
   return {
     slug,
     title: typeof data.title === "string" && data.title.trim() ? data.title : titleFromSlug(slug),
@@ -89,11 +104,11 @@ export interface ProjectSummary {
 // 배열 순서가 곧 목록 맨 앞의 표시 순서다(선언되지 않은 프로젝트는 그 뒤에 알파벳순).
 export const DECLARED_PROJECTS = ["Arte Project Team", "ROS2"];
 
-// group이 명시되지 않은 (예전) 글의 이름 기반 폴백: 여기 없으면 "study".
+// group이 명시되지 않은 (예전) 글의 이름 기반 폴백: 여기 있으면 첫 그룹(프로젝트), 없으면 둘째(스터디).
 export const PROJECT_CATEGORIES = ["Arte Project Team"];
 
 export function categoryType(name: string): CategoryType {
-  return PROJECT_CATEGORIES.includes(name) ? "project" : "study";
+  return PROJECT_CATEGORIES.includes(name) ? DEFAULT_GROUPS[0] : DEFAULT_GROUPS[1];
 }
 
 // 카테고리별 그룹(Project/Study): 해당 카테고리 글 중 group이 명시된 최신 글의 값을,

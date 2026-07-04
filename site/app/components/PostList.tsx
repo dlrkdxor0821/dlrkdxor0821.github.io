@@ -12,12 +12,14 @@ export default function PostList({
   onEdit,
   onDelete,
   onManageCategories,
+  onManageGroups,
 }: {
   posts: LoadedPost[];
   onNew: () => void;
   onEdit: (post: LoadedPost) => void;
   onDelete: (post: LoadedPost) => void;
   onManageCategories: () => void;
+  onManageGroups: () => void;
 }) {
   const sorted = [...posts].sort((a, b) => (a.fields.date < b.fields.date ? 1 : -1));
 
@@ -26,6 +28,9 @@ export default function PostList({
       <div className="manage-head">
         <h1 className="view__title">글 관리</h1>
         <div className="ed-actions">
+          <button type="button" className="ed-btn" onClick={onManageGroups}>
+            📁 그룹 관리
+          </button>
           <button type="button" className="ed-btn" onClick={onManageCategories}>
             🗂 카테고리 관리
           </button>

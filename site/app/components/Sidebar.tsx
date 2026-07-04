@@ -5,13 +5,7 @@ import { usePathname } from "next/navigation";
 import { useAdmin } from "./AdminContext";
 
 type Item = { slug: string; title: string; date: string; tags: string[] };
-type CategoryType = "project" | "study";
-type Project = { name: string; type: CategoryType; logs: Item[] };
-
-const GROUPS: { type: CategoryType; label: string }[] = [
-  { type: "project", label: "PROJECT" },
-  { type: "study", label: "STUDY" },
-];
+type Project = { name: string; type: string; logs: Item[] };
 
 function AdminFooter() {
   const { ready, loggedIn, logout } = useAdmin();
@@ -28,7 +22,7 @@ function AdminFooter() {
   );
 }
 
-export default function Sidebar({ projects }: { projects: Project[] }) {
+export default function Sidebar({ projects, groups }: { projects: Project[]; groups: string[] }) {
   const pathname = usePathname() ?? "/";
 
   return (
@@ -39,17 +33,18 @@ export default function Sidebar({ projects }: { projects: Project[] }) {
       </Link>
 
       <nav className="rail__nav">
-        {projects.length === 0 && <div className="rail__none">프로젝트 없음</div>}
-        {GROUPS.map(({ type, label }) => {
-          const group = projects.filter((p) => p.type === type);
+        {projects.length === 0 && <div className="rail__none">카테고리 없음</div>}
+        {groups.map((groupName) => {
+          const group = projects.filter((p) => p.type === groupName);
           if (group.length === 0) return null;
+          const href = `/groups/${encodeURIComponent(groupName)}`;
           return (
-            <section className="rail__section" key={type}>
+            <section className="rail__section" key={groupName}>
               <Link
-                href={`/groups/${type}`}
-                className={"rail__heading rail__heading--link" + (pathname === `/groups/${type}` ? " is-active" : "")}
+                href={href}
+                className={"rail__heading rail__heading--link" + (pathname === href ? " is-active" : "")}
               >
-                {label}
+                {groupName}
               </Link>
               {group.map((p) => {
                 const isActiveCategory = pathname === `/projects/${encodeURIComponent(p.name)}`;

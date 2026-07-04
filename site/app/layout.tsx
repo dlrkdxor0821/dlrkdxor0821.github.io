@@ -1,6 +1,6 @@
 import "./globals.css";
 import Shell from "./components/Shell";
-import { getProjects, getPostsByProject } from "@/lib/posts";
+import { getProjects, getPostsByProject, getGroups } from "@/lib/posts";
 
 export const metadata = {
   title: "log — 개발 기록",
@@ -13,6 +13,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     type: pr.type,
     logs: getPostsByProject(pr.name).map((p) => ({ slug: p.slug, title: p.title, date: p.date, tags: p.tags })),
   }));
+  const configured = getGroups();
+  const used = projects.map((p) => p.type);
+  const groups = [...configured, ...used].filter((g, i, a) => a.indexOf(g) === i);
 
   return (
     <html lang="ko">
@@ -26,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <div className="grain" aria-hidden="true" />
-        <Shell projects={projects}>{children}</Shell>
+        <Shell projects={projects} groups={groups}>{children}</Shell>
       </body>
     </html>
   );

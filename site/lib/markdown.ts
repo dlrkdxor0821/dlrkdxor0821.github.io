@@ -1,13 +1,14 @@
 // content/*.md 의 frontmatter를 파싱·생성하는 순수 함수. 클라이언트 에디터에서 사용.
 // lib/posts.ts(빌드 시 gray-matter)와 같은 파일 포맷을 다루되, 브라우저에서 동작하도록 의존성 없이 구현.
 
-export type CategoryGroup = "project" | "study";
+// 그룹은 임의의 문자열 이름(예: "프로젝트", "스터디", "회고").
+export type CategoryGroup = string;
 
 export interface PostFields {
   title: string;
   date: string; // YYYY-MM-DD
   project: string;
-  group?: CategoryGroup; // Project / Study 대분류. 없으면 lib/posts의 이름 기반 폴백.
+  group?: CategoryGroup; // 대분류(그룹) 이름. 없으면 lib/posts의 이름 기반 폴백.
   tags: string[];
   body: string;
 }
@@ -71,7 +72,7 @@ export function parseMarkdown(raw: string): PostFields {
       fields.project = unquote(val);
     } else if (key === "group") {
       const g = unquote(val);
-      if (g === "project" || g === "study") fields.group = g;
+      if (g) fields.group = g;
     }
   }
   return fields;
@@ -84,7 +85,7 @@ export function buildMarkdown(f: PostFields): string {
     `date: ${f.date}`,
     `project: ${yamlScalar(f.project)}`,
   ];
-  if (f.group === "project" || f.group === "study") lines.push(`group: ${f.group}`);
+  if (f.group) lines.push(`group: ${yamlScalar(f.group)}`);
   if (f.tags.length === 0) {
     lines.push("tags: []");
   } else {

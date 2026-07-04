@@ -2,47 +2,41 @@
 
 import { useMemo, useState } from "react";
 import { CategoryGroup } from "@/lib/markdown";
-import { PROJECT_CATEGORY_NAMES } from "@/lib/adminConfig";
+import { fallbackGroup } from "@/lib/adminConfig";
 import { LoadedPost } from "./PostList";
 
 type Cat = { name: string; count: number; group: CategoryGroup };
 
 function groupOf(post: LoadedPost): CategoryGroup {
-  return post.fields.group ?? (PROJECT_CATEGORY_NAMES.includes(post.fields.project) ? "project" : "study");
+  return post.fields.group ?? fallbackGroup(post.fields.project);
 }
 
 function CatRow({
   cat,
+  groups,
   busy,
   onApply,
 }: {
   cat: Cat;
+  groups: string[];
   busy: boolean;
   onApply: (oldName: string, newName: string, newGroup: CategoryGroup) => void;
 }) {
   const [name, setName] = useState(cat.name);
   const [group, setGroup] = useState<CategoryGroup>(cat.group);
   const changed = name.trim() !== cat.name || group !== cat.group;
+  const groupOptions = groups.includes(group) ? groups : [group, ...groups];
 
   return (
     <li className="catrow">
       <input className="ed-input catrow__name" value={name} onChange={(e) => setName(e.target.value)} />
-      <div className="ed-seg catrow__seg">
-        <button
-          type="button"
-          className={"ed-seg__btn" + (group === "project" ? " is-active" : "")}
-          onClick={() => setGroup("project")}
-        >
-          프로젝트
-        </button>
-        <button
-          type="button"
-          className={"ed-seg__btn" + (group === "study" ? " is-active" : "")}
-          onClick={() => setGroup("study")}
-        >
-          스터디
-        </button>
-      </div>
+      <select className="ed-input ed-select catrow__seg" value={group} onChange={(e) => setGroup(e.target.value)}>
+        {groupOptions.map((g) => (
+          <option key={g} value={g}>
+            {g}
+          </option>
+        ))}
+      </select>
       <span className="catrow__count">{cat.count}개</span>
       <button
         type="button"
@@ -58,11 +52,13 @@ function CatRow({
 
 export default function CategoryManager({
   posts,
+  groups,
   busy,
   onApply,
   onBack,
 }: {
   posts: LoadedPost[];
+  groups: string[];
   busy: boolean;
   onApply: (oldName: string, newName: string, newGroup: CategoryGroup) => void;
   onBack: () => void;
@@ -86,14 +82,16 @@ export default function CategoryManager({
           ← 글 목록
         </button>
       </div>
-      <p className="ed-hint">이름을 바꾸거나 대분류(프로젝트/스터디)를 바꾸면 그 카테고리의 모든 글에 반영됩니다.</p>
+      <p className="ed-hint">
+        이름이나 그룹을 바꾸면 그 카테고리의 모든 글에 반영됩니다. 새 카테고리는 글쓰기의 “카테고리” 칸에 새 이름을 입력하면 생겨요.
+      </p>
 
       {cats.length === 0 ? (
         <p className="empty">카테고리가 없어요.</p>
       ) : (
         <ul className="catlist">
           {cats.map((c) => (
-            <CatRow key={c.name} cat={c} busy={busy} onApply={onApply} />
+            <CatRow key={c.name} cat={c} groups={groups} busy={busy} onApply={onApply} />
           ))}
         </ul>
       )}
