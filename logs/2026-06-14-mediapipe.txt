@@ -1,0 +1,423 @@
+3:I[9275,[],""]
+5:I[1343,[],""]
+6:I[30,["231","static/chunks/231-87925b9c7247c60f.js","185","static/chunks/app/layout-b98a45a9fe68ce50.js"],"default"]
+2:T4895,<h1>MediaPipe 학습 노트</h1>
+<p>구글의 실시간 미디어 처리 프레임워크 MediaPipe 개념 정리. 무엇을 하는지, 솔루션 종류, 그래프 구조, 동작 원리(검출+추적), 랜드마크 좌표 읽기, 실전 코드(Python/JS), 커스텀(Model Maker), YOLO와의 차이, 핵심 요약까지.</p>
+<hr>
+<h2>1. MediaPipe란?</h2>
+<p><strong>MediaPipe</strong>(by Google)는 이미지·영상·오디오 같은 <strong>미디어 스트림을 실시간으로 처리하는 ML 파이프라인 프레임워크</strong>다. 핵심은 두 가지다.</p>
+<ol>
+<li><strong>프레임워크</strong> — Calculator(처리 노드)들을 그래프로 연결해 미디어 처리 파이프라인을 만드는 엔진.</li>
+<li><strong>솔루션(Tasks)</strong> — 그 위에 미리 만들어 놓은 기성 기능들(손·얼굴·포즈 인식 등). 대부분 사람들이 쓰는 건 이쪽.</li>
+</ol>
+<p>YOLO가 &quot;아무 물체나 박스로 찾는&quot; 범용 탐지라면, MediaPipe는 <strong>사람 몸(손·얼굴·자세) 인식에 특화</strong>되어 있고, 그 결과를 박스가 아니라 <strong>랜드마크(키포인트 좌표)</strong> 로 준다.</p>
+<pre><code>[입력 영상]  →  MediaPipe  →  손 관절 21개 좌표 / 얼굴 468점 / 포즈 33점 …
+                              (박스가 아니라 &quot;점들의 위치&quot;)
+</code></pre>
+<p><strong>특징 요약</strong></p>
+<ul>
+<li><strong>온디바이스(on-device)</strong> — 서버 없이 폰·브라우저·노트북 안에서 처리.</li>
+<li><strong>실시간·경량</strong> — 모바일·웹에서 수십 FPS 목표. CPU만으로도 동작, GPU 가속 옵션.</li>
+<li><strong>멀티플랫폼</strong> — Python / JavaScript(Web, WASM) / Android / iOS / C++.</li>
+<li><strong>멀티모달</strong> — 비전뿐 아니라 오디오·텍스트 Task도 있음.</li>
+</ul>
+<blockquote>
+<p>비유: YOLO = &quot;사진에서 물건 찾아 네모 치기&quot;, MediaPipe = &quot;사람 손가락 마디·얼굴 윤곽·관절에 점 찍기&quot;.</p>
+</blockquote>
+<hr>
+<h2>2. MediaPipe 종류 (Task / Solution)</h2>
+<p>특화 기능별로 Task가 나뉜다. (구버전 <code>mediapipe.solutions</code> API → 신버전 <strong>MediaPipe Tasks API</strong>로 정리되는 중. 개념은 동일.)</p>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>하는 일</th>
+<th>출력</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Hand Landmarker</strong></td>
+<td>손 인식</td>
+<td>손당 <strong>21개</strong> 관절 랜드마크</td>
+</tr>
+<tr>
+<td><strong>Pose Landmarker</strong></td>
+<td>전신 자세</td>
+<td><strong>33개</strong> 신체 키포인트</td>
+</tr>
+<tr>
+<td><strong>Face Landmarker</strong></td>
+<td>얼굴 메시</td>
+<td><strong>468개</strong>(홍채 포함 478) 3D 랜드마크</td>
+</tr>
+<tr>
+<td><strong>Face Detector</strong></td>
+<td>얼굴 위치</td>
+<td>바운딩 박스 + 6개 키포인트</td>
+</tr>
+<tr>
+<td><strong>Gesture Recognizer</strong></td>
+<td>손동작 인식</td>
+<td>손 랜드마크 + 제스처 라벨</td>
+</tr>
+<tr>
+<td><strong>Image Segmenter</strong></td>
+<td>영역 분할</td>
+<td>픽셀 마스크(배경 분리 등)</td>
+</tr>
+<tr>
+<td><strong>Holistic</strong>(레거시)</td>
+<td>통합</td>
+<td>얼굴+양손+포즈 한 번에(543점)</td>
+</tr>
+<tr>
+<td><strong>Object Detector / Image Classifier</strong></td>
+<td>범용 탐지·분류</td>
+<td>박스 / 클래스 (YOLO 영역과 겹침)</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>비전 외에도 Audio Classifier, Text Classifier, <strong>LLM Inference API</strong> 등 멀티모달 Task가 있다. 다만 MediaPipe의 대표 강점은 <strong>손·얼굴·포즈 랜드마크</strong>다.</p>
+</blockquote>
+<hr>
+<h2>3. 핵심 구조 — 그래프 / Calculator / Packet</h2>
+<p>MediaPipe 프레임워크의 바닥은 <strong>그래프(Graph)</strong> 다. 데이터가 노드들을 따라 흐르며 가공된다.</p>
+<pre><code>[영상 프레임]
+     │  (Packet: 타임스탬프 붙은 데이터 한 덩어리)
+     ▼
+┌──────────────┐   Stream    ┌──────────────┐   Stream   ┌──────────────┐
+│ Calculator A │ ──────────▶ │ Calculator B │ ─────────▶ │ Calculator C │
+│ (전처리/리사이즈)│            │ (모델 추론)    │            │ (랜드마크 디코드)│
+└──────────────┘             └──────────────┘            └──────────────┘
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>용어</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Graph</strong></td>
+<td>처리 파이프라인 전체. 노드와 연결의 집합</td>
+</tr>
+<tr>
+<td><strong>Calculator</strong></td>
+<td>그래프의 노드 1개 = 한 가지 처리 단위(리사이즈·추론·디코드 등)</td>
+</tr>
+<tr>
+<td><strong>Stream</strong></td>
+<td>Calculator를 잇는 데이터 통로</td>
+</tr>
+<tr>
+<td><strong>Packet</strong></td>
+<td>스트림을 흐르는 데이터 한 단위. <strong>타임스탬프</strong>를 가짐(영상 동기화의 핵심)</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>Task API를 쓰면 이 그래프가 내부에 숨겨져 있어 신경 쓸 필요 없다. 하지만 &quot;왜 실시간 동기화가 잘 되나&quot; = 패킷 타임스탬프 기반 그래프 엔진 덕분이라는 점만 알면 된다.</p>
+</blockquote>
+<hr>
+<h2>4. 동작 원리 — 검출(Detector) + 추적(Tracker)</h2>
+<p>랜드마크 Task들은 대부분 <strong>2단 파이프라인</strong>으로 동작한다. (Hand·Pose 공통)</p>
+<pre><code>1) Detector 모델 :  손/사람이 어디 있나 → 관심영역(ROI) 박스 찾기
+2) Landmark 모델 :  그 박스 안에서 관절 점들의 정확한 위치 회귀(regression)
+</code></pre>
+<p><strong>핵심 최적화 — 추적(tracking)</strong>: 영상에서 매 프레임 Detector를 돌리면 무겁다. 그래서 한 번 찾은 뒤에는 <strong>이전 프레임의 랜드마크로 ROI를 예측</strong>해 Landmark 모델만 돌리고, <strong>추적을 놓쳤을 때만</strong> Detector를 다시 호출한다.</p>
+<pre><code>프레임1: [Detector] → ROI → [Landmark] → 21점
+프레임2: 이전 21점으로 ROI 예측 → [Landmark]만 실행  ← 빠름
+프레임3: 〃
+   …
+추적 실패(손 사라짐/가림) → [Detector] 다시 실행
+</code></pre>
+<ul>
+<li>Hand = Palm Detector + Hand Landmark. Pose = BlazePose(Detector + Tracker). Face Mesh = 468점 회귀.</li>
+<li>그래서 <strong>영상이 이미지보다 빠르고 안정적</strong>이다(추적이 작동하므로).</li>
+</ul>
+<h3>좌표계 (중요)</h3>
+<p>랜드마크 좌표는 보통 <strong>정규화(normalized)</strong> 값이다.</p>
+<table>
+<thead>
+<tr>
+<th>값</th>
+<th>의미</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>x</code>, <code>y</code></td>
+<td>이미지 너비·높이로 나눈 <strong>0~1</strong> 비율 (해상도 무관)</td>
+</tr>
+<tr>
+<td><code>z</code></td>
+<td>깊이(상대값). 작을수록 카메라에 가까움</td>
+</tr>
+<tr>
+<td>world landmarks</td>
+<td>미터(m) 단위 3D 좌표(Pose·Hand에서 제공)</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>픽셀 좌표가 필요하면 <code>x * 이미지폭</code>, <code>y * 이미지높이</code>로 환산한다.</p>
+</blockquote>
+<hr>
+<h2>5. 랜드마크 인덱스 읽기</h2>
+<p>좌표는 &quot;몇 번 점이 어디&quot;인지 인덱스로 정해져 있다. 자주 쓰는 것만:</p>
+<p><strong>손(Hand) — 21점</strong></p>
+<pre><code>0: 손목(wrist)
+4: 엄지 끝      8: 검지 끝
+12: 중지 끝     16: 약지 끝     20: 새끼 끝
+(각 손가락은 뿌리→끝으로 4마디씩 번호)
+</code></pre>
+<p><strong>포즈(Pose) — 33점 (대표)</strong></p>
+<pre><code>0: 코     11/12: 좌/우 어깨
+13/14: 좌/우 팔꿈치   15/16: 좌/우 손목
+23/24: 좌/우 골반     25/26: 좌/우 무릎     27/28: 좌/우 발목
+</code></pre>
+<p><strong>얼굴(Face Mesh) — 468점</strong>: 눈·입·윤곽·코를 촘촘히 덮는 메시. (홍채 추적 켜면 478점)</p>
+<blockquote>
+<p>예: &quot;엄지 끝(4)이 검지 끝(8)보다 위에 있으면 좋아요(👍)&quot; 같은 규칙을 좌표로 직접 판별할 수 있다.</p>
+</blockquote>
+<hr>
+<h2>6. 실전 사용 (코드)</h2>
+<h3>6.1 Python — Tasks API (신버전 권장)</h3>
+<pre><code class="language-python">import mediapipe as mp
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
+
+# 1) 모델(.task) 로드
+base = python.BaseOptions(model_asset_path=&quot;hand_landmarker.task&quot;)
+options = vision.HandLandmarkerOptions(base_options=base, num_hands=2)
+detector = vision.HandLandmarker.create_from_options(options)
+
+# 2) 추론
+image = mp.Image.create_from_file(&quot;hand.jpg&quot;)
+result = detector.detect(image)
+
+# 3) 결과 — 손마다 21개 랜드마크
+for hand in result.hand_landmarks:
+    tip = hand[8]                 # 검지 끝
+    print(tip.x, tip.y, tip.z)    # 정규화 좌표
+</code></pre>
+<h3>6.2 Python — Solutions API (레거시, 자료 많음)</h3>
+<pre><code class="language-python">import cv2
+import mediapipe as mp
+
+hands = mp.solutions.hands.Hands(max_num_hands=2, min_detection_confidence=0.5)
+img = cv2.imread(&quot;hand.jpg&quot;)
+res = hands.process(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))  # MediaPipe는 RGB 입력
+
+if res.multi_hand_landmarks:
+    for hand in res.multi_hand_landmarks:
+        for lm in hand.landmark:
+            print(lm.x, lm.y, lm.z)
+</code></pre>
+<h3>6.3 JavaScript — 웹(브라우저)에서 실시간</h3>
+<pre><code class="language-javascript">import { HandLandmarker, FilesetResolver } from &quot;@mediapipe/tasks-vision&quot;;
+
+const vision = await FilesetResolver.forVisionTasks(&quot;/wasm&quot;);
+const handLandmarker = await HandLandmarker.createFromOptions(vision, {
+  baseOptions: { modelAssetPath: &quot;hand_landmarker.task&quot; },
+  runningMode: &quot;VIDEO&quot;,
+  numHands: 2,
+});
+
+// 웹캠 루프에서
+const result = handLandmarker.detectForVideo(videoEl, performance.now());
+// result.landmarks → 캔버스에 점 그리기
+</code></pre>
+<blockquote>
+<p>입력 색공간 주의: MediaPipe는 <strong>RGB</strong>를 기대한다. OpenCV는 BGR이라 변환 필요(<code>COLOR_BGR2RGB</code>).</p>
+</blockquote>
+<hr>
+<h2>7. 커스텀 — 직접 학습 가능한가?</h2>
+<p>핵심 랜드마크 모델(손·얼굴·포즈)은 보통 <strong>그대로 가져다 쓴다</strong>(직접 학습 X). 대신 두 가지 방향으로 &quot;내 것&quot;을 만든다.</p>
+<h3>① 랜드마크 위에 분류기 얹기 (가장 흔함)</h3>
+<p>MediaPipe가 뽑아준 <strong>좌표를 입력 특징으로</strong> 삼아, 그 위에 규칙/작은 모델을 붙인다.</p>
+<pre><code>[MediaPipe] → 손 21점 좌표 → [내 분류기] → &quot;가위 / 바위 / 보&quot;
+                              (규칙 기반 or 학습된 소형 모델)
+</code></pre>
+<ul>
+<li>&quot;손 흔들기(인사)&quot;처럼 <strong>시간 흐름</strong>이 필요한 동작은, 여러 프레임의 좌표 시퀀스를 모아 판별한다.</li>
+</ul>
+<h3>② Model Maker로 커스텀 (일부 Task)</h3>
+<p><strong>MediaPipe Model Maker</strong>로 Gesture Recognizer·Image Classifier·Object Detector 등 일부 Task를 <strong>내 데이터로 파인튜닝</strong>할 수 있다.</p>
+<h3>③ Gesture Recognizer 기본 제스처</h3>
+<p>별도 학습 없이 바로 인식되는 손동작: 👍 Thumb Up, 👎 Thumb Down, ✌️ Victory, ☝️ Pointing Up, ✊ Closed Fist, 🖐️ Open Palm, 🤟 ILoveYou.</p>
+<hr>
+<h2>8. 실행 모드와 성능</h2>
+<p>Tasks API는 입력 종류에 따라 <strong>실행 모드</strong>를 고른다.</p>
+<table>
+<thead>
+<tr>
+<th>모드</th>
+<th>용도</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>IMAGE</code></td>
+<td>정지 이미지 1장</td>
+</tr>
+<tr>
+<td><code>VIDEO</code></td>
+<td>영상 프레임(타임스탬프 순서, 추적 활성)</td>
+</tr>
+<tr>
+<td><code>LIVE_STREAM</code></td>
+<td>웹캠 등 실시간 스트림(콜백으로 비동기 결과)</td>
+</tr>
+</tbody></table>
+<ul>
+<li><strong>on-device</strong> 처리라 네트워크·서버 비용이 없고 지연이 적다.</li>
+<li>모델은 모바일용 경량(<code>.task</code>/<code>.tflite</code>)이라 가볍지만, 여러 사람·여러 손을 동시에 잡으면 부담이 커진다 → <code>num_hands</code> 등으로 제한.</li>
+<li>정확도/속도 트레이드오프: <code>min_detection_confidence</code>, <code>min_tracking_confidence</code>로 조절.</li>
+</ul>
+<hr>
+<h2>9. 핵심 요약 ★</h2>
+<h3>30초 설명</h3>
+<blockquote>
+<p>&quot;MediaPipe는 구글의 온디바이스 실시간 미디어 처리 프레임워크로, 특히 손·얼굴·자세를 인식해 <strong>박스가 아니라 랜드마크(키포인트 좌표)</strong> 로 돌려줍니다. 내부적으로는 Calculator들을 잇는 그래프 파이프라인이고, 랜드마크 Task는 &#39;검출 → 추적&#39;으로 매 프레임 검출을 피해 실시간 성능을 냅니다.&quot;</p>
+</blockquote>
+<h3>외울 핵심 흐름 5개</h3>
+<p><strong>① 온디바이스 실시간 → ② 손·얼굴·포즈 특화 → ③ 출력=랜드마크 좌표 → ④ 검출+추적 파이프라인 → ⑤ 좌표 위에 분류기 얹어 동작 인식</strong></p>
+<h3>꼬리질문 대비</h3>
+<table>
+<thead>
+<tr>
+<th>질문</th>
+<th>한 줄 답</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>YOLO와 차이?</td>
+<td>YOLO=범용 박스 탐지, MediaPipe=사람 부위 랜드마크 좌표</td>
+</tr>
+<tr>
+<td>출력이 뭔가요?</td>
+<td>정규화(0~1) 키포인트 좌표(x,y,z), 일부는 미터 단위 world 좌표</td>
+</tr>
+<tr>
+<td>왜 실시간이 빠른가?</td>
+<td>매 프레임 검출 대신, 이전 프레임 랜드마크로 추적해 Landmark 모델만 실행</td>
+</tr>
+<tr>
+<td>동작(제스처) 인식은?</td>
+<td>MediaPipe가 준 좌표를 특징으로 규칙/소형 모델을 따로 얹어 분류</td>
+</tr>
+<tr>
+<td>커스텀 학습은?</td>
+<td>핵심 모델은 그대로 쓰고, Model Maker로 일부 Task만 파인튜닝</td>
+</tr>
+<tr>
+<td>좌표계는?</td>
+<td>x,y는 이미지 대비 0~1 비율, z는 상대 깊이</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>10. YOLO vs MediaPipe (함께 보기)</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>YOLO</th>
+<th>MediaPipe</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>만든 곳</td>
+<td>Ultralytics 등</td>
+<td>Google</td>
+</tr>
+<tr>
+<td>핵심</td>
+<td>범용 객체 탐지(무엇이 어디)</td>
+<td>사람 부위 인식(손·얼굴·포즈)</td>
+</tr>
+<tr>
+<td>출력</td>
+<td>바운딩 박스 + 클래스</td>
+<td>랜드마크(키포인트 좌표)</td>
+</tr>
+<tr>
+<td>커스텀 학습</td>
+<td>✅ 내 데이터로 자유롭게</td>
+<td>△ 핵심 모델은 기성, 일부만 Model Maker</td>
+</tr>
+<tr>
+<td>잘하는 것</td>
+<td>번호판·제품 검수·개수 세기</td>
+<td>손동작·자세 교정·얼굴 필터</td>
+</tr>
+</tbody></table>
+<ul>
+<li><strong>함께 쓰기</strong>: YOLO로 사람 영역을 찾고 → 그 안을 MediaPipe로 포즈 분석하는 식으로 조합 가능. (영상 실시간이면 FPS·자원 부담 주의)</li>
+<li>선택 기준: &quot;아무 물체나 찾고 직접 학습&quot; → YOLO / &quot;사람 손·얼굴·관절을 실시간 좌표로&quot; → MediaPipe.</li>
+</ul>
+<hr>
+<h2>11. 확장성 — 필요한 만큼 골라 쓰고, 합쳐 쓰기</h2>
+<p>랜드마크는 고정된 한 세트로 나오지만, <strong>무엇을 쓸지·무엇과 합칠지는 자유</strong>다. 이게 MediaPipe를 응용하는 핵심.</p>
+<h3>11.1 원하는 점만 골라 쓰기</h3>
+<p>결과는 인덱스로 접근하는 좌표 배열이라, 필요한 번호만 뽑고 나머지는 무시하면 된다.</p>
+<pre><code class="language-python">result = hand_landmarker.detect(image)
+hand = result.hand_landmarks[0]      # 21개 점 배열
+
+WANT = [4, 8]                        # 엄지끝 · 검지끝만 관심
+for i in WANT:
+    lm = hand[i]
+    print(i, lm.x, lm.y)             # 나머지 19개는 안 봐도 됨
+</code></pre>
+<blockquote>
+<p>예: 엄지(4)–검지(8) 거리로 꼬집기(pinch) 판별 → 두 점이면 충분.</p>
+</blockquote>
+<p><strong>주의 — 구분할 것</strong></p>
+<ul>
+<li><strong>어떤 점을 쓸지</strong> = 자유롭게 선택 ✅</li>
+<li><strong>점 개수 자체를 줄이기</strong>(연산 절약) = ❌ 모델이 한 세트를 통째로 출력. 부담을 줄이려면 점이 아니라 <code>num_hands</code>·해상도·VIDEO 추적 쪽을 조절한다.</li>
+</ul>
+<h3>11.2 여러 Task의 랜드마크 합쳐 쓰기</h3>
+<p>Hand·Pose·Face는 독립 Task라, 같은 프레임에 각각 돌려 좌표를 합칠 수 있다.</p>
+<pre><code class="language-python">hand_result = hand_landmarker.detect(image)   # 손 21점
+pose_result = pose_landmarker.detect(image)   # 포즈 33점
+# Pose 손목(15/16)과 Hand 손목(0)을 이어 &quot;팔 + 손가락&quot;을 한 골격으로 연결
+</code></pre>
+<ul>
+<li>장점: 필요한 부위만 조합(팔 자세 + 손가락 동작 등).</li>
+<li>단점: 모델을 여러 개 돌리면 연산 부담↑ → FPS 주의.</li>
+</ul>
+<h3>11.3 Holistic — 한 번에 통합</h3>
+<p>얼굴 + 양손 + 포즈를 한 파이프라인에서 같이 뽑는 통합 솔루션(총 543점). &quot;전신 + 손동작&quot;을 함께 볼 때 편하다. (구버전 <code>solutions</code> API 계열 — 신버전에선 11.2의 개별 조합으로 가는 추세)</p>
+<table>
+<thead>
+<tr>
+<th>필요한 것</th>
+<th>방법</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>손가락 디테일만</td>
+<td>Hand Landmarker만</td>
+</tr>
+<tr>
+<td>전신 자세만</td>
+<td>Pose Landmarker만</td>
+</tr>
+<tr>
+<td>팔 자세 + 손가락 동작</td>
+<td>Hand + Pose 조합</td>
+</tr>
+<tr>
+<td>얼굴까지 전부</td>
+<td>Holistic</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>정리: <strong>점은 골라 쓰고, Task는 합쳐 쓴다.</strong> 핵심 모델을 건드리지 않고도 좌표 조합만으로 응용 범위를 넓힐 수 있다.</p>
+</blockquote>
+<hr>
+<h2>한 줄 결론</h2>
+<blockquote>
+<p>MediaPipe는 결국 <strong>온디바이스에서 사람의 손·얼굴·포즈를 랜드마크 좌표로 뽑아주는 도구</strong>다. 그래프 파이프라인 위에서 &#39;검출+추적&#39;으로 실시간 성능을 내고, 그 <strong>좌표 위에 내 규칙/모델을 얹어</strong> 제스처·자세 판별을 만든다. 박스가 필요하면 YOLO, 키포인트가 필요하면 MediaPipe.</p>
+</blockquote>
+4:["slug","2026-06-14-mediapipe","d"]
+0:["3OAE3lecaUJF5TvcDIyhn",[[["",{"children":["logs",{"children":[["slug","2026-06-14-mediapipe","d"],{"children":["__PAGE__?{\"slug\":\"2026-06-14-mediapipe\"}",{}]}]}]},"$undefined","$undefined",true],["",{"children":["logs",{"children":[["slug","2026-06-14-mediapipe","d"],{"children":["__PAGE__",{},[["$L1",["$","article",null,{"className":"view","children":[["$","div",null,{"className":"doc__date","children":"2026. 06. 14"}],["$","h1",null,{"className":"doc__title","children":"MediaPipe 학습 노트"}],["$","div",null,{"className":"doc__meta","children":[["$","span",null,{"className":"chip","children":"study"}],[["$","span","MediaPipe",{"className":"tagword","children":["#","MediaPipe"]}],["$","span","랜드마크",{"className":"tagword","children":["#","랜드마크"]}],["$","span","실시간추론",{"className":"tagword","children":["#","실시간추론"]}],["$","span","딥러닝",{"className":"tagword","children":["#","딥러닝"]}]]]}],["$","div",null,{"className":"prose","dangerouslySetInnerHTML":{"__html":"$2"}}]]}]],null],null]},["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children","logs","children","$4","children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","notFoundStyles":"$undefined","styles":null}],null]},["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children","logs","children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","notFoundStyles":"$undefined","styles":null}],null]},[["$","html",null,{"lang":"ko","children":[["$","head",null,{"children":[["$","link",null,{"rel":"preconnect","href":"https://fonts.googleapis.com"}],["$","link",null,{"rel":"preconnect","href":"https://fonts.gstatic.com","crossOrigin":"anonymous"}],["$","link",null,{"href":"https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap","rel":"stylesheet"}]]}],["$","body",null,{"children":[["$","div",null,{"className":"grain","aria-hidden":"true"}],["$","$L6",null,{"projects":[{"name":"Arte Project Team","logs":[{"slug":"2026-06-16-리비-시스템","title":"리비 시스템 — 다중로봇·UI·인식 종합 정리","date":"2026-06-16"},{"slug":"2026-06-15-libi-project-topic","title":"프로젝트-주제선정","date":"2026-06-15"},{"slug":"2026-06-14-yolo-vs-ocr","title":"YOLO vs OCR — 언제 같이 쓰나","date":"2026-06-14"}]},{"name":"ROS2","logs":[{"slug":"2026-06-15-map-pgm-to-gazebo","title":"map.pgm_To_Gazebo","date":"2026-06-15"},{"slug":"2026-06-15-ros2-communication-types","title":"ros2-communication-types","date":"2026-06-15"},{"slug":"2026-06-15-ros2-dds","title":"ros2-DDS","date":"2026-06-15"},{"slug":"2026-06-15-ros2-namespace","title":"ros2-namespace","date":"2026-06-15"}]},{"name":"Database","logs":[{"slug":"2026-06-15-database-basics","title":"database-basics","date":"2026-06-15"}]},{"name":"Nav2","logs":[{"slug":"2026-06-16-amcl","title":"AMCL 정리 — 파티클로 내 위치 찾기 (Adaptive Monte Carlo Localization)","date":"2026-06-16"},{"slug":"2026-06-16-bt-navigator","title":"Nav2 BT Navigator 완전 정복 — 그리고 우리는 왜 NavigateToPose를 골랐나","date":"2026-06-16"},{"slug":"2026-06-16-coordinate-transform","title":"좌표계 변환 정리 — 회전·이동·동차변환과 쿼터니언","date":"2026-06-16"},{"slug":"2026-06-16-nav2-pkg","title":"Nav2 PKG 총정리 — 아키텍처·서버별 설정·Python 제어","date":"2026-06-16"},{"slug":"2026-06-16-nav2-planner-controller-plugins","title":"Nav2 Planner·Controller 플러그인 심층 분석 — 종류·작동원리·장단점","date":"2026-06-16"},{"slug":"2026-06-16-odometry","title":"Odometry 정리 — 시작점 기준 상대 위치 추정","date":"2026-06-16"},{"slug":"2026-06-16-slam","title":"SLAM 정리 — 위치추정과 지도작성을 동시에","date":"2026-06-16"},{"slug":"2026-06-16-tf","title":"TF 정리 — ROS2의 좌표 프레임 변환 시스템 (tf2)","date":"2026-06-16"}]},{"name":"study","logs":[{"slug":"2026-06-16-filter","title":"필터 총정리 — 정의 · 동작원리 · 사용용도","date":"2026-06-16"},{"slug":"2026-06-16-pid-controller","title":"PID 제어기 정리 — 이론 + gogoping 적용 분석","date":"2026-06-16"},{"slug":"2026-06-14-mediapipe","title":"MediaPipe 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-ncnn","title":"NCNN 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-ocr","title":"OCR 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-yolo","title":"YOLO 학습 노트","date":"2026-06-14"}]},{"name":"개발환경","logs":[{"slug":"2026-06-16-vnc-viewer","title":"VNC Viewer 설치 — 원격 GUI 접속 도구","date":"2026-06-16"}]}],"children":["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":"404"}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],"notFoundStyles":[],"styles":null}]}]]}]]}],null],null],[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/css/71ba6e220d0e3e6a.css","precedence":"next","crossOrigin":"$undefined"}]],[null,"$L7"]]]]]
+7:[["$","meta","0",{"name":"viewport","content":"width=device-width, initial-scale=1"}],["$","meta","1",{"charSet":"utf-8"}],["$","title","2",{"children":"log — 개발 기록"}],["$","meta","3",{"name":"description","content":"마크다운으로 쓰는 개발 기록"}]]
+1:null

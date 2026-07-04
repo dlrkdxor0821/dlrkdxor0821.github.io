@@ -1,0 +1,365 @@
+3:I[9275,[],""]
+5:I[1343,[],""]
+6:I[30,["231","static/chunks/231-87925b9c7247c60f.js","185","static/chunks/app/layout-b98a45a9fe68ce50.js"],"default"]
+2:T2ec0,<h1>OCR 학습 노트</h1>
+<p>광학 문자 인식(OCR) 개념을 개발자 관점에서 정리. OCR이 뭔지, 실제 파이프라인 4단계, 인식 모델 내부 구조, 단순 텍스트를 넘어선 Document AI, 정확도 지표(CER/WER), 전처리의 역할과 &quot;딥러닝 OCR은 과한 전처리가 독&quot;이라는 반전, 클라우드 vs 온디바이스 선택까지.</p>
+<hr>
+<h2>OCR이 뭐냐</h2>
+<p><strong>OCR(Optical Character Recognition, 광학 문자 인식)</strong> = 이미지 속 글자를 컴퓨터가 다룰 수 있는 <strong>텍스트 데이터</strong>로 바꾸는 기술.</p>
+<p>예: 영수증 사진의 &quot;총액 12,000원&quot;이라는 <strong>글자 픽셀</strong> → <code>&quot;12000&quot;</code>이라는 <strong>문자열</strong>.</p>
+<p>쓰임: 문서 스캔, 영수증·명함 자동 입력, 번호판 인식, 사진 속 외국어 번역, 공장 라벨·일련번호 읽기 등.</p>
+<h2>실제 파이프라인은 4단계</h2>
+<p>개념적으로는 &quot;검출 + 인식&quot; 2단계지만, 실무에선 전처리·후처리가 정확도를 좌우한다.</p>
+<pre><code>① 전처리  →  ② 검출(Detection)  →  ③ 인식(Recognition)  →  ④ 후처리
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>단계</th>
+<th>하는 일</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>① 전처리</td>
+<td>흑백화, 이진화, 기울기 보정, 노이즈 제거, 해상도 키우기</td>
+</tr>
+<tr>
+<td>② 검출</td>
+<td>글자가 <strong>어디 있는지</strong> 박스로 찾기 (DBNet, EAST 등)</td>
+</tr>
+<tr>
+<td>③ 인식</td>
+<td>박스 안 글자가 <strong>무슨 글자인지</strong> 읽기</td>
+</tr>
+<tr>
+<td>④ 후처리</td>
+<td>정규식·사전으로 교정, 신뢰도 필터링, 포맷 검증</td>
+</tr>
+</tbody></table>
+<p>→ ②가 &quot;글자 위치 찾기&quot;(탐지), ③이 &quot;그 글자가 ㄱ인지 A인지&quot;(분류). 객체탐지와 비슷한 흐름.</p>
+<h2>인식 모델 내부 구조</h2>
+<table>
+<thead>
+<tr>
+<th>방식</th>
+<th>핵심</th>
+<th>특징</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>CRNN + CTC</strong></td>
+<td>CNN으로 특징 → RNN으로 순서 → CTC로 정렬</td>
+<td>고전·표준, 가볍고 빠름</td>
+</tr>
+<tr>
+<td><strong>Attention/Transformer</strong></td>
+<td>문맥 보고 글자 예측</td>
+<td>정확도 높음, 무거움</td>
+</tr>
+<tr>
+<td><strong>TrOCR</strong></td>
+<td>이미지→텍스트를 통째로</td>
+<td>손글씨·어려운 글자에 강함</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p><strong>CTC</strong>(Connectionist Temporal Classification): 글자 개수·위치를 미리 안 정해도 <strong>가변 길이 텍스트</strong>를 읽게 해주는 핵심 기법. OCR 공부하면 자주 나오는 용어.</p>
+</blockquote>
+<h2>OCR은 텍스트만 주는 게 아니다 — Document AI</h2>
+<p>실무에서 진짜 중요한 건 <strong>글자 + 위치 + 구조</strong>다.</p>
+<ul>
+<li><strong>Bounding box</strong> — 각 글자/단어 좌표</li>
+<li><strong>Confidence score</strong> — 인식이 얼마나 확실한지 (필터링 필수)</li>
+<li><strong>Layout analysis</strong> — 제목/문단/표 구분</li>
+<li><strong>Table extraction</strong> — 표를 행·열 구조로</li>
+<li><strong>Key-Value extraction</strong> — &quot;이름: 홍길동&quot;에서 키-값 짝짓기 (서류 자동화의 핵심)</li>
+</ul>
+<p>→ 단순 글자 읽기를 넘어서면 이걸 <strong>Document AI / IDP(지능형 문서 처리)</strong> 라고 부른다.</p>
+<h2>정확도 지표 (필수)</h2>
+<table>
+<thead>
+<tr>
+<th>지표</th>
+<th>의미</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>CER</strong> (Character Error Rate)</td>
+<td><strong>글자</strong> 단위 오류율 — OCR 표준</td>
+</tr>
+<tr>
+<td><strong>WER</strong> (Word Error Rate)</td>
+<td><strong>단어</strong> 단위 오류율</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>&quot;정확도 95%&quot;는 모호하다. <strong>CER/WER로 측정</strong>해야 비교가 된다 (낮을수록 좋음).</p>
+</blockquote>
+<h2>전처리 — 무엇을, 왜</h2>
+<p>OCR 모델은 깨끗하고 또렷한 글자에 강하다. 전처리는 모델이 읽기 쉽게 이미지를 다듬는 작업.</p>
+<table>
+<thead>
+<tr>
+<th>단계</th>
+<th>뭐 하나</th>
+<th>왜</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Grayscale</td>
+<td>컬러 → 흑백</td>
+<td>색은 불필요, 연산↓</td>
+</tr>
+<tr>
+<td>Resize/Upscale</td>
+<td>작은 글자 키우기</td>
+<td>작으면 못 읽음</td>
+</tr>
+<tr>
+<td>Denoise</td>
+<td>잡티 제거</td>
+<td>점을 글자로 오인 방지</td>
+</tr>
+<tr>
+<td>Contrast(CLAHE)</td>
+<td>명암 키우기</td>
+<td>흐릿한 글자 또렷하게</td>
+</tr>
+<tr>
+<td><strong>Binarization(이진화)</strong></td>
+<td>흑/백 2색으로</td>
+<td>글자와 배경 분리 — 전처리 핵심</td>
+</tr>
+<tr>
+<td><strong>Deskew</strong></td>
+<td>기울기 보정</td>
+<td>기울면 인식률 급락</td>
+</tr>
+<tr>
+<td>Perspective 보정</td>
+<td>비스듬한 걸 정면으로</td>
+<td>영수증·간판</td>
+</tr>
+</tbody></table>
+<p>이진화는 조명 균일하면 <strong>Otsu</strong>, 그림자·불균일하면 <strong>Adaptive threshold</strong>.</p>
+<h2>⚠️ 반전: 요즘은 전처리를 덜 한다</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>옛날 OCR (Tesseract)</th>
+<th>요즘 딥러닝 OCR (PaddleOCR 등)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>전처리</td>
+<td>많이 해야 잘 됨 (이진화 필수)</td>
+<td>모델이 잡티·기울기를 어느 정도 알아서 처리</td>
+</tr>
+<tr>
+<td>입력</td>
+<td>흑백·이진화 선호</td>
+<td><strong>컬러 원본 그대로</strong>가 더 나을 때 많음</td>
+</tr>
+</tbody></table>
+<p>→ 딥러닝 OCR에 과하게 이진화하면 오히려 정보가 날아가 정확도가 떨어질 수 있다.</p>
+<p><strong>실무 원칙:</strong></p>
+<ol>
+<li>일단 <strong>원본 그대로 돌려본다</strong></li>
+<li>안 되면 <strong>뭐가 문제인지 진단</strong> (어두움? 기울었나? 작나?)</li>
+<li><strong>그 문제에 맞는 전처리만</strong> 적용 (다 하지 말고)</li>
+<li><strong>CER로 전/후 비교</strong> — 추측 말고 숫자로</li>
+</ol>
+<blockquote>
+<p>premature optimization은 만악의 근원. 전처리도 <strong>문제를 본 다음에</strong> 최적화.</p>
+</blockquote>
+<h2>클라우드 API vs 온디바이스</h2>
+<table>
+<thead>
+<tr>
+<th>기준</th>
+<th>클라우드 API</th>
+<th>자체/온디바이스</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>정확도</td>
+<td>보통 더 높음</td>
+<td>모델·튜닝에 달림</td>
+</tr>
+<tr>
+<td>비용</td>
+<td>호출당 과금</td>
+<td>초기 구축 후 무료</td>
+</tr>
+<tr>
+<td>개인정보</td>
+<td>외부 전송 ⚠️</td>
+<td>로컬 처리(안전)</td>
+</tr>
+<tr>
+<td>오프라인</td>
+<td>불가</td>
+<td>가능</td>
+</tr>
+</tbody></table>
+<p>→ 민감 정보·오프라인 → 자체 / 빠른 개발·최고 정확도 → 클라우드(CLOVA, Google Vision).</p>
+<p>온디바이스 배포 시 PaddleOCR 등을 <strong>NCNN/TFLite로 변환</strong>. 단 OCR은 검출+인식 두 모델이라 무거워서, 엣지에선 <strong>경량 모델 + 양자화</strong>가 거의 필수.</p>
+<h2>적절한 모델 선정</h2>
+<table>
+<thead>
+<tr>
+<th>도구</th>
+<th>언제 쓰면 좋나</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>EasyOCR</strong></td>
+<td>빠르게 프로토타입 — 파이썬 몇 줄로 바로 테스트하고 싶을 때</td>
+</tr>
+<tr>
+<td><strong>PaddleOCR</strong></td>
+<td>한글 포함 다국어, 실전 정확도와 엣지 배포(NCNN/TFLite 변환)까지 노릴 때</td>
+</tr>
+<tr>
+<td><strong>Tesseract</strong></td>
+<td>인쇄체 영문 문서 중심, 자료·레퍼런스 많은 검증된 표준이 필요할 때</td>
+</tr>
+<tr>
+<td><strong>TrOCR</strong></td>
+<td>손글씨나 까다로운 글자를 Transformer로 정확히 읽어야 할 때</td>
+</tr>
+<tr>
+<td><strong>CLOVA OCR / Google Vision</strong></td>
+<td>개발 부담 없이 최고 정확도 — 서류·영수증 자동화(클라우드 과금 감수)</td>
+</tr>
+</tbody></table>
+<h2>배포 런타임 (온디바이스)</h2>
+<p>OCR도 모델이라, 기기에 올리려면 <strong>배포 런타임</strong>으로 변환해서 얹어야 한다 (NCNN·TFLite 등이 여기 속함). OCR은 <strong>검출 + 인식 = 모델 2개</strong>라, 둘 다 변환·탑재해야 한다는 점만 주의.</p>
+<table>
+<thead>
+<tr>
+<th>런타임</th>
+<th>만든 곳</th>
+<th>가장 강한 타겟</th>
+<th>OCR 관점 메모</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Paddle Lite</strong></td>
+<td>Baidu</td>
+<td>모바일·ARM 엣지</td>
+<td><strong>PaddleOCR 순정 경로</strong>, 변환 손실 적고 궁합 최고</td>
+</tr>
+<tr>
+<td><strong>Paddle Inference</strong></td>
+<td>Baidu</td>
+<td>서버·데스크톱 GPU</td>
+<td>PaddleOCR을 서버에서 돌릴 때</td>
+</tr>
+<tr>
+<td><strong>NCNN</strong></td>
+<td>Tencent</td>
+<td>ARM CPU·임베디드</td>
+<td>가볍고 의존성 0, ONNX 거쳐 변환</td>
+</tr>
+<tr>
+<td><strong>TFLite</strong> (LiteRT)</td>
+<td>Google</td>
+<td>안드로이드·NPU/Edge TPU</td>
+<td>안드로이드 앱 통합 매끄러움</td>
+</tr>
+<tr>
+<td><strong>ONNX Runtime</strong></td>
+<td>Microsoft</td>
+<td>서버·데스크톱·범용</td>
+<td>플랫폼 호환성 넓음, 기준점</td>
+</tr>
+<tr>
+<td><strong>OpenVINO</strong></td>
+<td>Intel</td>
+<td>인텔 CPU·iGPU·VPU</td>
+<td>인텔 하드웨어면 가속 큼</td>
+</tr>
+<tr>
+<td><strong>TensorRT</strong></td>
+<td>NVIDIA</td>
+<td>NVIDIA GPU·Jetson</td>
+<td>GPU 극한 성능, Jetson 로봇이면 강력</td>
+</tr>
+<tr>
+<td><strong>MNN</strong></td>
+<td>Alibaba</td>
+<td>멀티플랫폼 균형</td>
+<td>CPU·GPU 골고루, iOS·안드로이드</td>
+</tr>
+<tr>
+<td><strong>Core ML</strong></td>
+<td>Apple</td>
+<td>iOS·맥</td>
+<td>애플 기기 전용이면</td>
+</tr>
+</tbody></table>
+<h3>PaddleOCR 변환 경로</h3>
+<pre><code>PaddleOCR 모델 (검출 + 인식)
+   ├─ Paddle Lite 로 변환  → 모바일·ARM (순정·1순위)
+   └─ ONNX 로 export
+        ├─ NCNN 으로 변환     → ARM 경량
+        ├─ TFLite 로 변환     → 안드로이드
+        ├─ ONNX Runtime 실행  → 서버·범용
+        ├─ OpenVINO 로 변환   → 인텔
+        └─ TensorRT 로 변환   → NVIDIA GPU/Jetson
+</code></pre>
+<h3>타겟 기기별 추천</h3>
+<table>
+<thead>
+<tr>
+<th>배포 대상</th>
+<th>1순위 런타임</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>라즈베리파이 (ARM CPU)</td>
+<td><strong>Paddle Lite</strong> (또는 NCNN)</td>
+</tr>
+<tr>
+<td>NVIDIA Jetson (로봇·GPU)</td>
+<td><strong>TensorRT</strong></td>
+</tr>
+<tr>
+<td>안드로이드 폰</td>
+<td><strong>TFLite</strong> 또는 Paddle Lite</td>
+</tr>
+<tr>
+<td>iOS 폰</td>
+<td><strong>Core ML</strong> 또는 MNN</td>
+</tr>
+<tr>
+<td>인텔 미니PC</td>
+<td><strong>OpenVINO</strong></td>
+</tr>
+<tr>
+<td>서버·클라우드</td>
+<td><strong>ONNX Runtime</strong> / Paddle Inference</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>OCR도 &quot;학습 → 변환 → 런타임에 얹어 배포&quot;라는 같은 흐름. <strong>PaddleOCR이면 순정 Paddle Lite가 1순위</strong>, 그 외엔 ONNX로 export 후 타겟 하드웨어에 맞는 런타임으로 변환.</p>
+</blockquote>
+<h2>흔한 함정</h2>
+<ul>
+<li>전처리 무시하고 모델만 탓하기 → 전처리부터 점검</li>
+<li>confidence score 안 거르기 → 쓰레기 결과까지 그대로 사용</li>
+<li>비슷한 글자(O/0, l/1) → 후처리 정규식·사전으로 교정</li>
+<li>한글에 Tesseract 기본값 → PaddleOCR 권장</li>
+</ul>
+<h2>핵심 요약</h2>
+<blockquote>
+<p>OCR = 이미지 속 글자 → 텍스트. 실무는 전처리·검출·인식·후처리 4단계.
+글자뿐 아니라 <strong>위치·구조·신뢰도</strong>까지 다루면 Document AI.
+정확도는 <strong>CER/WER</strong>로 측정. 딥러닝 OCR은 <strong>일단 원본으로 해보고</strong> 안 될 때 문제에 맞는 전처리만 추가.</p>
+</blockquote>
+4:["slug","2026-06-14-ocr","d"]
+0:["3OAE3lecaUJF5TvcDIyhn",[[["",{"children":["logs",{"children":[["slug","2026-06-14-ocr","d"],{"children":["__PAGE__?{\"slug\":\"2026-06-14-ocr\"}",{}]}]}]},"$undefined","$undefined",true],["",{"children":["logs",{"children":[["slug","2026-06-14-ocr","d"],{"children":["__PAGE__",{},[["$L1",["$","article",null,{"className":"view","children":[["$","div",null,{"className":"doc__date","children":"2026. 06. 14"}],["$","h1",null,{"className":"doc__title","children":"OCR 학습 노트"}],["$","div",null,{"className":"doc__meta","children":[["$","span",null,{"className":"chip","children":"study"}],[["$","span","OCR",{"className":"tagword","children":["#","OCR"]}],["$","span","문자인식",{"className":"tagword","children":["#","문자인식"]}],["$","span","컴퓨터비전",{"className":"tagword","children":["#","컴퓨터비전"]}],["$","span","전처리",{"className":"tagword","children":["#","전처리"]}],["$","span","온디바이스",{"className":"tagword","children":["#","온디바이스"]}]]]}],["$","div",null,{"className":"prose","dangerouslySetInnerHTML":{"__html":"$2"}}]]}]],null],null]},["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children","logs","children","$4","children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","notFoundStyles":"$undefined","styles":null}],null]},["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children","logs","children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","notFoundStyles":"$undefined","styles":null}],null]},[["$","html",null,{"lang":"ko","children":[["$","head",null,{"children":[["$","link",null,{"rel":"preconnect","href":"https://fonts.googleapis.com"}],["$","link",null,{"rel":"preconnect","href":"https://fonts.gstatic.com","crossOrigin":"anonymous"}],["$","link",null,{"href":"https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap","rel":"stylesheet"}]]}],["$","body",null,{"children":[["$","div",null,{"className":"grain","aria-hidden":"true"}],["$","$L6",null,{"projects":[{"name":"Arte Project Team","logs":[{"slug":"2026-06-16-리비-시스템","title":"리비 시스템 — 다중로봇·UI·인식 종합 정리","date":"2026-06-16"},{"slug":"2026-06-15-libi-project-topic","title":"프로젝트-주제선정","date":"2026-06-15"},{"slug":"2026-06-14-yolo-vs-ocr","title":"YOLO vs OCR — 언제 같이 쓰나","date":"2026-06-14"}]},{"name":"ROS2","logs":[{"slug":"2026-06-15-map-pgm-to-gazebo","title":"map.pgm_To_Gazebo","date":"2026-06-15"},{"slug":"2026-06-15-ros2-communication-types","title":"ros2-communication-types","date":"2026-06-15"},{"slug":"2026-06-15-ros2-dds","title":"ros2-DDS","date":"2026-06-15"},{"slug":"2026-06-15-ros2-namespace","title":"ros2-namespace","date":"2026-06-15"}]},{"name":"Database","logs":[{"slug":"2026-06-15-database-basics","title":"database-basics","date":"2026-06-15"}]},{"name":"Nav2","logs":[{"slug":"2026-06-16-amcl","title":"AMCL 정리 — 파티클로 내 위치 찾기 (Adaptive Monte Carlo Localization)","date":"2026-06-16"},{"slug":"2026-06-16-bt-navigator","title":"Nav2 BT Navigator 완전 정복 — 그리고 우리는 왜 NavigateToPose를 골랐나","date":"2026-06-16"},{"slug":"2026-06-16-coordinate-transform","title":"좌표계 변환 정리 — 회전·이동·동차변환과 쿼터니언","date":"2026-06-16"},{"slug":"2026-06-16-nav2-pkg","title":"Nav2 PKG 총정리 — 아키텍처·서버별 설정·Python 제어","date":"2026-06-16"},{"slug":"2026-06-16-nav2-planner-controller-plugins","title":"Nav2 Planner·Controller 플러그인 심층 분석 — 종류·작동원리·장단점","date":"2026-06-16"},{"slug":"2026-06-16-odometry","title":"Odometry 정리 — 시작점 기준 상대 위치 추정","date":"2026-06-16"},{"slug":"2026-06-16-slam","title":"SLAM 정리 — 위치추정과 지도작성을 동시에","date":"2026-06-16"},{"slug":"2026-06-16-tf","title":"TF 정리 — ROS2의 좌표 프레임 변환 시스템 (tf2)","date":"2026-06-16"}]},{"name":"study","logs":[{"slug":"2026-06-16-filter","title":"필터 총정리 — 정의 · 동작원리 · 사용용도","date":"2026-06-16"},{"slug":"2026-06-16-pid-controller","title":"PID 제어기 정리 — 이론 + gogoping 적용 분석","date":"2026-06-16"},{"slug":"2026-06-14-mediapipe","title":"MediaPipe 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-ncnn","title":"NCNN 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-ocr","title":"OCR 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-yolo","title":"YOLO 학습 노트","date":"2026-06-14"}]},{"name":"개발환경","logs":[{"slug":"2026-06-16-vnc-viewer","title":"VNC Viewer 설치 — 원격 GUI 접속 도구","date":"2026-06-16"}]}],"children":["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":"404"}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],"notFoundStyles":[],"styles":null}]}]]}]]}],null],null],[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/css/71ba6e220d0e3e6a.css","precedence":"next","crossOrigin":"$undefined"}]],[null,"$L7"]]]]]
+7:[["$","meta","0",{"name":"viewport","content":"width=device-width, initial-scale=1"}],["$","meta","1",{"charSet":"utf-8"}],["$","title","2",{"children":"log — 개발 기록"}],["$","meta","3",{"name":"description","content":"마크다운으로 쓰는 개발 기록"}]]
+1:null

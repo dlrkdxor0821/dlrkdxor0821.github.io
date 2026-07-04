@@ -1,0 +1,165 @@
+3:I[9275,[],""]
+5:I[1343,[],""]
+6:I[30,["231","static/chunks/231-87925b9c7247c60f.js","185","static/chunks/app/layout-b98a45a9fe68ce50.js"],"default"]
+2:T1637,<h1>DDS 완전 정리 (ROS2)</h1>
+<h2>1. DDS란? — 개념</h2>
+<p>ROS2는 여러 프로그램(노드)이 데이터를 주고받는다. 이 <strong>&quot;어떻게 주고받느냐&quot;</strong> 를 담당하는 통신 토대가 <strong>DDS(Data Distribution Service)</strong> 다.</p>
+<p><strong>비유 — 단체 카톡방 📱</strong></p>
+<ul>
+<li>노드 = 사람들 / 토픽 = 채팅방 / DDS = 채팅 시스템 자체</li>
+</ul>
+<p><strong>ROS1 vs ROS2</strong></p>
+<ul>
+<li>ROS1: 중간에 <strong>총무(master)</strong> 가 연결 → 총무 죽으면 다 끊김 ❌</li>
+<li>ROS2(DDS): 총무 없이 <strong>노드끼리 알아서 찾아 직접 대화</strong> ✅</li>
+</ul>
+<blockquote>
+<p><strong>DDS = ROS2 노드들이 총무 없이 서로 찾아 직접 통신하게 해주는 표준 통신 방식.</strong></p>
+</blockquote>
+<h2>2. DDS의 3대 동작 원리</h2>
+<table>
+<thead>
+<tr>
+<th>원리</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Pub/Sub (발행/구독)</strong></td>
+<td>보내는 쪽(publisher)이 토픽에 던지면, 듣는 쪽(subscriber)이 받음</td>
+</tr>
+<tr>
+<td><strong>Discovery (자동 탐색)</strong></td>
+<td>총무 없이 노드끼리 &quot;나 여기 있어!&quot; 외쳐서 서로 발견</td>
+</tr>
+<tr>
+<td><strong>QoS (품질 정책)</strong></td>
+<td>토픽마다 &quot;확실히 전달 vs 빠르게 대충&quot; 등 전달 품질 설정</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>3. ROS2 통신 3종류 — 전부 DDS Pub/Sub 위에서 돈다</h2>
+<p>DDS가 원래 제공하는 건 <strong>오직 Pub/Sub(토픽)</strong>. Service·Action은 그걸 <strong>조합해 만든 상위 패턴</strong>이다.</p>
+<table>
+<thead>
+<tr>
+<th>방식</th>
+<th>모양</th>
+<th>비유</th>
+<th>리비 예시</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Topic</strong></td>
+<td>계속 흘려보냄, 다대다</td>
+<td>라디오 📻</td>
+<td>카메라·라이다, <code>/cmd_vel</code></td>
+</tr>
+<tr>
+<td><strong>Service</strong></td>
+<td>요청→응답, 1:1</td>
+<td>전화 ☎️</td>
+<td>&quot;배터리 몇%?&quot; 묻고 답</td>
+</tr>
+<tr>
+<td><strong>Action</strong></td>
+<td>긴 작업+진행+취소</td>
+<td>택배 📦</td>
+<td>&quot;서가 가서 책 집기&quot;</td>
+</tr>
+</tbody></table>
+<pre><code>Topic   = DDS Pub/Sub 그 자체
+Service = 요청용 토픽 + 응답용 토픽
+Action  = Service(목표·취소·결과) + Topic(피드백·상태)
+</code></pre>
+<blockquote>
+<p>즉 <strong>모든 ROS2 통신은 밑바닥에서 DDS Pub/Sub로 굴러간다.</strong></p>
+</blockquote>
+<h3>언제 뭘 쓰나</h3>
+<table>
+<thead>
+<tr>
+<th>상황</th>
+<th>선택</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>데이터를 계속 흘려보냄 (센서, 속도)</td>
+<td><strong>Topic</strong></td>
+</tr>
+<tr>
+<td>한 번 묻고 바로 답 받기 (설정 변경, 상태 조회)</td>
+<td><strong>Service</strong></td>
+</tr>
+<tr>
+<td>오래 걸리는 작업 + 진행상황 보고 + 중간 취소</td>
+<td><strong>Action</strong></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>4. DDS 종류 — Fast DDS vs Cyclone DDS</h2>
+<p>DDS는 <strong>규격(약속)</strong> 이라 만든 회사가 여러 곳이다. 하는 일은 같고 <strong>만든 방식만 다르다</strong> (카톡 vs 라인).</p>
+<h3>1️⃣ Fast DDS (eProsima) — 기본값</h3>
+<ul>
+<li><strong>원리</strong>: 표준 DDS를 풀스펙 구현 + 추가 기능. 같은 PC 노드끼린 <strong>공유메모리(Shared Memory)</strong> 로 직행 (네트워크 안 거침 → 빠름)</li>
+<li><strong>기능</strong>: 공유메모리(대용량 초고속), Discovery Server(대규모 탐색 최적화), XML 세밀 설정</li>
+<li><strong>언제</strong>: 그냥 시작 / 한 PC에서 영상·라이다 대용량 / 노드 수백 개 대규모</li>
+</ul>
+<h3>2️⃣ Cyclone DDS (Eclipse) — 가볍고 튼튼</h3>
+<ul>
+<li><strong>원리</strong>: 꼭 필요한 것만 단순 구현 → 가볍고 동작이 <strong>예측 가능, 잘 안 끊김</strong></li>
+<li><strong>기능</strong>: 경량(저메모리), 안정적·결정적, 설정 간단(<code>CYCLONEDDS_URI</code>)</li>
+<li><strong>언제</strong>: <strong>멀티로봇</strong> / 통신 꼬일 때 1순위 전환 / 라즈베리파이 등 저사양 / Nav2 불안정</li>
+</ul>
+<h3>선택 가이드</h3>
+<table>
+<thead>
+<tr>
+<th>상황</th>
+<th>선택</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>그냥 시작 / 단일 로봇</td>
+<td><strong>Fast DDS</strong></td>
+</tr>
+<tr>
+<td>한 PC 대용량(영상·PCL)</td>
+<td><strong>Fast DDS</strong> (공유메모리)</td>
+</tr>
+<tr>
+<td>노드 수백 개</td>
+<td><strong>Fast DDS</strong> (Discovery Server)</td>
+</tr>
+<tr>
+<td><strong>멀티로봇 / RMF</strong></td>
+<td><strong>Cyclone DDS</strong></td>
+</tr>
+<tr>
+<td>통신 꼬임·끊김 디버깅</td>
+<td><strong>Cyclone DDS</strong></td>
+</tr>
+<tr>
+<td>저사양 보드(파이)</td>
+<td><strong>Cyclone DDS</strong></td>
+</tr>
+</tbody></table>
+<h3>바꾸는 법 + 주의</h3>
+<pre><code class="language-bash">sudo apt install ros-jazzy-rmw-cyclonedds-cpp
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp   # Cyclone
+export RMW_IMPLEMENTATION=rmw_fastrtps_cpp     # Fast(기본)
+</code></pre>
+<blockquote>
+<p>⚠️ <strong>모든 노드가 같은 종류여야 통신됨</strong> (Fast ↔ Cyclone 섞으면 대화 안 됨)</p>
+</blockquote>
+<hr>
+<h2>한 줄 요약</h2>
+<blockquote>
+<p><strong>DDS</strong> = ROS2가 총무 없이 직접 통신하는 토대(Pub/Sub·Discovery·QoS).
+<strong>통신 3종</strong>(Topic·Service·Action)도 전부 DDS Pub/Sub 위에서 동작.
+<strong>종류</strong>는 Fast DDS(기본·기능많음)와 Cyclone DDS(가볍고 튼튼) — 멀티로봇/꼬일 때 Cyclone, 섞으면 안 됨.</p>
+</blockquote>
+4:["slug","2026-06-15-ros2-dds","d"]
+0:["3OAE3lecaUJF5TvcDIyhn",[[["",{"children":["logs",{"children":[["slug","2026-06-15-ros2-dds","d"],{"children":["__PAGE__?{\"slug\":\"2026-06-15-ros2-dds\"}",{}]}]}]},"$undefined","$undefined",true],["",{"children":["logs",{"children":[["slug","2026-06-15-ros2-dds","d"],{"children":["__PAGE__",{},[["$L1",["$","article",null,{"className":"view","children":[["$","div",null,{"className":"doc__date","children":"2026. 06. 15"}],["$","h1",null,{"className":"doc__title","children":"ros2-DDS"}],["$","div",null,{"className":"doc__meta","children":[["$","span",null,{"className":"chip","children":"ROS2"}],[["$","span","DDS",{"className":"tagword","children":["#","DDS"]}],["$","span","통신",{"className":"tagword","children":["#","통신"]}],["$","span","FastDDS",{"className":"tagword","children":["#","FastDDS"]}],["$","span","CycloneDDS",{"className":"tagword","children":["#","CycloneDDS"]}],["$","span","QoS",{"className":"tagword","children":["#","QoS"]}]]]}],["$","div",null,{"className":"prose","dangerouslySetInnerHTML":{"__html":"$2"}}]]}]],null],null]},["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children","logs","children","$4","children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","notFoundStyles":"$undefined","styles":null}],null]},["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children","logs","children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","notFoundStyles":"$undefined","styles":null}],null]},[["$","html",null,{"lang":"ko","children":[["$","head",null,{"children":[["$","link",null,{"rel":"preconnect","href":"https://fonts.googleapis.com"}],["$","link",null,{"rel":"preconnect","href":"https://fonts.gstatic.com","crossOrigin":"anonymous"}],["$","link",null,{"href":"https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap","rel":"stylesheet"}]]}],["$","body",null,{"children":[["$","div",null,{"className":"grain","aria-hidden":"true"}],["$","$L6",null,{"projects":[{"name":"Arte Project Team","logs":[{"slug":"2026-06-16-리비-시스템","title":"리비 시스템 — 다중로봇·UI·인식 종합 정리","date":"2026-06-16"},{"slug":"2026-06-15-libi-project-topic","title":"프로젝트-주제선정","date":"2026-06-15"},{"slug":"2026-06-14-yolo-vs-ocr","title":"YOLO vs OCR — 언제 같이 쓰나","date":"2026-06-14"}]},{"name":"ROS2","logs":[{"slug":"2026-06-15-map-pgm-to-gazebo","title":"map.pgm_To_Gazebo","date":"2026-06-15"},{"slug":"2026-06-15-ros2-communication-types","title":"ros2-communication-types","date":"2026-06-15"},{"slug":"2026-06-15-ros2-dds","title":"ros2-DDS","date":"2026-06-15"},{"slug":"2026-06-15-ros2-namespace","title":"ros2-namespace","date":"2026-06-15"}]},{"name":"Database","logs":[{"slug":"2026-06-15-database-basics","title":"database-basics","date":"2026-06-15"}]},{"name":"Nav2","logs":[{"slug":"2026-06-16-amcl","title":"AMCL 정리 — 파티클로 내 위치 찾기 (Adaptive Monte Carlo Localization)","date":"2026-06-16"},{"slug":"2026-06-16-bt-navigator","title":"Nav2 BT Navigator 완전 정복 — 그리고 우리는 왜 NavigateToPose를 골랐나","date":"2026-06-16"},{"slug":"2026-06-16-coordinate-transform","title":"좌표계 변환 정리 — 회전·이동·동차변환과 쿼터니언","date":"2026-06-16"},{"slug":"2026-06-16-nav2-pkg","title":"Nav2 PKG 총정리 — 아키텍처·서버별 설정·Python 제어","date":"2026-06-16"},{"slug":"2026-06-16-nav2-planner-controller-plugins","title":"Nav2 Planner·Controller 플러그인 심층 분석 — 종류·작동원리·장단점","date":"2026-06-16"},{"slug":"2026-06-16-odometry","title":"Odometry 정리 — 시작점 기준 상대 위치 추정","date":"2026-06-16"},{"slug":"2026-06-16-slam","title":"SLAM 정리 — 위치추정과 지도작성을 동시에","date":"2026-06-16"},{"slug":"2026-06-16-tf","title":"TF 정리 — ROS2의 좌표 프레임 변환 시스템 (tf2)","date":"2026-06-16"}]},{"name":"study","logs":[{"slug":"2026-06-16-filter","title":"필터 총정리 — 정의 · 동작원리 · 사용용도","date":"2026-06-16"},{"slug":"2026-06-16-pid-controller","title":"PID 제어기 정리 — 이론 + gogoping 적용 분석","date":"2026-06-16"},{"slug":"2026-06-14-mediapipe","title":"MediaPipe 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-ncnn","title":"NCNN 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-ocr","title":"OCR 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-yolo","title":"YOLO 학습 노트","date":"2026-06-14"}]},{"name":"개발환경","logs":[{"slug":"2026-06-16-vnc-viewer","title":"VNC Viewer 설치 — 원격 GUI 접속 도구","date":"2026-06-16"}]}],"children":["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":"404"}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],"notFoundStyles":[],"styles":null}]}]]}]]}],null],null],[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/css/71ba6e220d0e3e6a.css","precedence":"next","crossOrigin":"$undefined"}]],[null,"$L7"]]]]]
+7:[["$","meta","0",{"name":"viewport","content":"width=device-width, initial-scale=1"}],["$","meta","1",{"charSet":"utf-8"}],["$","title","2",{"children":"log — 개발 기록"}],["$","meta","3",{"name":"description","content":"마크다운으로 쓰는 개발 기록"}]]
+1:null

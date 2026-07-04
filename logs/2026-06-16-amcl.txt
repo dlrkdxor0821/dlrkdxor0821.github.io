@@ -1,0 +1,152 @@
+3:I[9275,[],""]
+5:I[1343,[],""]
+6:I[30,["231","static/chunks/231-87925b9c7247c60f.js","185","static/chunks/app/layout-b98a45a9fe68ce50.js"],"default"]
+2:T2729,<h1>AMCL 정리 — 파티클로 내 위치 찾기</h1>
+<blockquote>
+<p>지도상에서 로봇의 실제 위치를 파악하기 위해 <strong>Particle(입자)을 흩뿌려 위치를 추정</strong>하는 알고리즘.
+(출처: SMG0317-AMCL 교육자료 / ROS2 Nav2 PKG 14~19p / MATLAB Tech Talks &quot;Understanding the Particle Filter&quot;)
+흐름: <strong>큰 그림 → 왜 칼만이 아니라 파티클인가 → 4단계 로직 → 시나리오 → Adaptive의 의미 → 한 줄 요약</strong></p>
+</blockquote>
+<hr>
+<h2>Part 0. 한 줄로 — AMCL이란?</h2>
+<p><strong>A</strong>daptive <strong>M</strong>onte <strong>C</strong>arlo <strong>L</strong>ocalization.</p>
+<p>방금 켜진 로봇은 자기가 지도 어디에 있는지 모른다. 그래서 지도 전체에 수천 개의 <strong>&#39;가상의 나&#39;(입자)</strong> 를 흩뿌린다. 각 입자는 <em>&quot;내가 만약 여기 (x, y)에서 이 방향(yaw)을 보고 있다면?&quot;</em> 이라는 <strong>하나의 가설</strong>이다. 이 가설들을 센서로 검증하며 진짜 위치 하나로 수렴시킨다.</p>
+<blockquote>
+<p>핵심: <strong>분신술(입자)을 써서, 센서와 가장 잘 맞는 분신만 살아남게 하는 것.</strong></p>
+</blockquote>
+<hr>
+<h2>Part 1. 왜 칼만 필터가 아니라 파티클인가?</h2>
+<p>센서와 이동의 오차를 융합한다고 하면 흔히 <strong>칼만 필터</strong>를 떠올리지만, 칼만은 <strong>데이터가 가우시안(정규) 분포를 따른다고 가정할 때만</strong> 쓸 수 있다.</p>
+<h3>1-1. 가우시안 분포 (Gaussian Distribution)</h3>
+<blockquote>
+<p><em>&quot;나는 3m 지점에 있다(X) → 나는 3m 지점에 있을 확률이 99%다(O)&quot;</em></p>
+</blockquote>
+<ul>
+<li>로봇은 &quot;내 위치는 정확히 (3, 0)이야&quot;라고 단정하지 않는다.</li>
+<li>대신 <strong>중심값(평균 μ)</strong> 과 <strong>오차 정도(분산 σ)</strong> 로 표현한다.</li>
+<li>의미: <em>&quot;아마 3m(μ)에 있을 텐데, 바퀴가 미끄러졌을 수 있으니 2.9~3.1m 사이(σ² 범위)에 있을 확률이 가장 높아&quot;</em> 라고 위치를 <strong>&#39;분포&#39;로</strong> 유연하게 본다.</li>
+</ul>
+<h3>1-2. 칼만 필터 = 가우시안 2개를 겹쳐 융합</h3>
+<p>아폴로가 달에 갈 때 궤도를 계산한 알고리즘. 가우시안 분포를 2개 겹쳐 가장 완벽한 위치를 찾는다.</p>
+<table>
+<thead>
+<tr>
+<th>단계</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>1. 예측 (Prediction)</strong></td>
+<td>데드레코닝으로 &quot;3m쯤 온 것 같아&quot; → 넓고 펑퍼짐한 가우시안 (불확실)</td>
+</tr>
+<tr>
+<td><strong>2. 업데이트 (Update)</strong></td>
+<td>LiDAR/GPS로 벽까지 거리 재서 &quot;센서로 보니 3.1m&quot; → 또 다른 가우시안</td>
+</tr>
+<tr>
+<td><strong>융합</strong></td>
+<td>두 가우시안을 곱하면 → 폭이 좁고 뾰족한 새 가우시안 (두 정보의 장점만 취함)</td>
+</tr>
+</tbody></table>
+<h3>1-3. 칼만의 한계 — Unimodal</h3>
+<p>위치가 <strong>&#39;단 하나의 뾰족한 산(Unimodal)&#39;</strong> 이라고 가정한다. 그래서 로봇이 <strong>똑같이 생긴 두 복도 사이</strong>에서 <em>&quot;나 A 복도인가? B 복도인가?&quot;</em> 하고 헷갈리는 상황(<strong>Multimodal</strong>)을 표현하지 못한다.</p>
+<blockquote>
+<p>처음 위치를 전혀 모르거나(global localization), 똑같이 생긴 벽 때문에 헷갈리는 상황은 <strong>수학적으로 가우시안이 아니다.</strong> → <strong>비가우시안 분포를 다룰 수 있는 파티클 필터</strong>가 필요하다.</p>
+</blockquote>
+<h3>1-4. 파티클 분포 (Particle Distribution)</h3>
+<blockquote>
+<p><em>&quot;단 하나의 정답(종 모양) 대신, 수많은 가능성(점)들로 쪼개서 생각하자&quot;</em></p>
+</blockquote>
+<ul>
+<li>위치 확률을 수식 하나로 퉁치지 않고, 수백~수천 개의 <strong>이산 점(Particle)</strong> 으로 흩뿌려 표현.</li>
+<li>똑같이 생긴 A 방·B 방이 있을 때, 가우시안은 <em>&quot;A와 B의 중간인 벽 속에 있다&quot;</em> 는 멍청한 평균을 내버린다.</li>
+<li>파티클은 입자를 두 그룹으로 쪼개서 <em><strong>&quot;A 방 확률 반, B 방 확률 반&quot;</strong></em> 을 동시에 자연스럽게 표현.</li>
+</ul>
+<blockquote>
+<p>그게 바로 <strong>몬테카를로 위치 추정법 (MCL)</strong> 이다. (AMCL의 &#39;MCL&#39; 부분)</p>
+</blockquote>
+<p>관련: 필터 전반 정리는 [[2026-06-16-filter]] 참고. (KF → EKF/UKF → Particle 흐름)</p>
+<hr>
+<h2>Part 2. 파티클 필터의 로직 (핵심 4단계)</h2>
+<h3>1. 흩뿌리기 (Initialization)</h3>
+<p>로봇을 켜면(혹은 RViz에서 <code>2D Pose Estimate</code>로 대략 위치를 찍어주면) 그 주변에 수많은 초록색 점(입자)을 촥 뿌린다. <em>&quot;이 근처 어딘가에 내가 있을 거야&quot;</em> 하고 수백 개의 분신술을 쓰는 것.</p>
+<h3>2. 이동하기 (Motion Update)</h3>
+<p>로봇 바퀴가 앞으로 1m 굴러가면 지도 위 입자들도 다 같이 앞으로 1m씩 이동한다. 이때 바퀴가 미끄러질 수 있으니 <strong>수학적 오차(Noise)</strong> 를 살짝 섞어 입자 간격을 약간 더 흐트러뜨린다.</p>
+<h3>3. 스캔하고 비교하기 (Measurement / Weighting)</h3>
+<p>로봇이 LiDAR로 주변 벽·장애물을 스캔한 뒤 모든 입자에게 묻는다.</p>
+<blockquote>
+<p><em>&quot;야, 너희가 지금 서 있는 그 위치에서 LiDAR를 쏘면, 지금 내 센서값이랑 똑같은 모양의 벽이 잡혀?&quot;</em></p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>입자</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>일치하는 입자</strong></td>
+<td>&quot;내 위치 지도랑 센서값이 딱 맞는데?&quot; → <strong>가중치(Weight) 팍팍 상승</strong></td>
+</tr>
+<tr>
+<td><strong>불일치하는 입자</strong></td>
+<td>&quot;난 허공인데 센서는 벽 앞이라네?&quot; → <strong>가중치 깎여서 죽음</strong></td>
+</tr>
+</tbody></table>
+<h3>4. 살아남은 자들의 번식 (Resampling)</h3>
+<p>가중치 높은(현실과 가장 비슷한) 입자들은 살아남아 자기 주변에 새 입자를 <strong>복제(번식)</strong> 하고, 엉뚱한 곳을 짚은 입자는 소멸한다. 로봇이 조금 주행하며 이 과정을 반복하면, 흩어졌던 수천 점이 <strong>진짜 로봇 위치 한 곳으로 촥 뭉친다.</strong></p>
+<blockquote>
+<p>2 → 3 → 4 반복 = 예측 → 가중 → 리샘플링 루프.</p>
+</blockquote>
+<hr>
+<h2>Part 3. 시나리오로 따라가기</h2>
+<ol>
+<li><strong>초기화</strong> — 방금 일어난 로봇. Binary Occupancy Grid 위에서 자기 위치를 모름(?? 투성이).</li>
+<li><strong>지형지물 스캔</strong> — 앞에 벽이 있다고 가정하고 LiDAR로 스캔 → 노이즈 섞인 지저분한 측정값.</li>
+<li><strong>Deadreckon(추측항법)</strong> — <em>&quot;(0,0)에서 초당 1m로 3초 직진했으니 지금 (3,0)일 거야&quot;</em> 처럼 <strong>주행거리계(Odometry)</strong> 로 위치 추정. 단, 오차 누적됨.</li>
+<li><strong>측정값 ↔ 지도 매칭</strong> — 감지된 패턴을 지도와 비교 → 가능한 위치들을 추려냄.</li>
+<li><strong>오차 감안한 확률 분포</strong> — LiDAR에 노이즈가 있음을 알기에, &quot;이 위치에 존재할 수 있다&quot;는 <strong>확률(히트맵)</strong> 로 표현. 하나의 측정값만으로는 정확한 위치를 못 잡음.</li>
+<li><strong>파티클 뿌리기</strong> — 각 파티클은 &#39;가상의 나(로봇)&#39;. 실제 LiDAR와 비슷한 값을 내는 파티클일수록 <code>more likely</code>, 동떨어지면 <code>less likely</code>.</li>
+<li><strong>가중치 + 리샘플링 반복</strong> — 확률 높은 곳에 파티클 재생성 → 로봇이 계속 이동하면 분포 크기가 자연히 줄어듦 → 특정 한 곳으로 수렴 → <strong>위치 찾기 성공.</strong></li>
+</ol>
+<hr>
+<h2>Part 4. 왜 그냥 MCL이 아니라 &#39;Adaptive&#39;인가?</h2>
+<p>로봇이 위치를 완벽히 확신해 점이 한 곳에 뭉쳤는데도 수천 개 입자를 계속 계산하면 <strong>CPU가 너무 힘들다.</strong> 그래서 &#39;A(Adaptive, 적응형)&#39;가 붙는다 — <strong>입자 수를 상황에 맞게 스스로 조절.</strong></p>
+<table>
+<thead>
+<tr>
+<th>상황</th>
+<th>입자 수</th>
+<th>이유</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>길을 잃어 헷갈릴 때</strong></td>
+<td>~5,000개로 왕창↑</td>
+<td>사방을 샅샅이 탐색 (전역 탐색)</td>
+</tr>
+<tr>
+<td><strong>자기 위치를 확신할 때</strong></td>
+<td>~200개로 확↓</td>
+<td>배터리·연산량 절약</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>Adaptive = 상황에 맞게 <strong>분신술 개수를 스스로 조절하는 똑똑함.</strong> (KLD-sampling 기반)</p>
+</blockquote>
+<hr>
+<h2>한 줄 요약</h2>
+<blockquote>
+<p><strong>AMCL은 &quot;분신술(파티클)로 가설을 흩뿌리고, LiDAR로 검증해 잘 맞는 분신만 번식시켜 진짜 위치로 수렴시키는&quot; 위치추정 알고리즘이다.</strong> 칼만 필터(가우시안·unimodal)와 달리 <em>&quot;여기일 수도, 저기일 수도&quot;</em> 한 multimodal·비가우시안 상황(전역 위치추정, 똑같은 복도)을 다룰 수 있고, &#39;Adaptive&#39;로 입자 수까지 동적 조절해 효율을 챙긴다. ROS2에서는 Nav2의 <code>amcl</code> 노드가 맵(map) + LiDAR(scan) + 오도메트리(odom)를 받아 <code>map→odom</code> TF를 보정하는 역할로 쓰인다.</p>
+</blockquote>
+<hr>
+<h2>참고자료</h2>
+<ul>
+<li>ROS2 Nav2 PKG 교육자료 14p~19p</li>
+<li>MATLAB Tech Talks — <em>Understanding the Particle Filter | Autonomous Navigation, Part 2</em> (YouTube)</li>
+<li>관련 노트: [[2026-06-16-filter]] (필터 총정리 — 파티클 필터 위치)</li>
+</ul>
+4:["slug","2026-06-16-amcl","d"]
+0:["3OAE3lecaUJF5TvcDIyhn",[[["",{"children":["logs",{"children":[["slug","2026-06-16-amcl","d"],{"children":["__PAGE__?{\"slug\":\"2026-06-16-amcl\"}",{}]}]}]},"$undefined","$undefined",true],["",{"children":["logs",{"children":[["slug","2026-06-16-amcl","d"],{"children":["__PAGE__",{},[["$L1",["$","article",null,{"className":"view","children":[["$","div",null,{"className":"doc__date","children":"2026. 06. 16"}],["$","h1",null,{"className":"doc__title","children":"AMCL 정리 — 파티클로 내 위치 찾기 (Adaptive Monte Carlo Localization)"}],["$","div",null,{"className":"doc__meta","children":[["$","span",null,{"className":"chip","children":"Nav2"}],[["$","span","AMCL",{"className":"tagword","children":["#","AMCL"]}],["$","span","Localization",{"className":"tagword","children":["#","Localization"]}],["$","span","파티클필터",{"className":"tagword","children":["#","파티클필터"]}],["$","span","Nav2",{"className":"tagword","children":["#","Nav2"]}],["$","span","위치추정",{"className":"tagword","children":["#","위치추정"]}],["$","span","LiDAR",{"className":"tagword","children":["#","LiDAR"]}]]]}],["$","div",null,{"className":"prose","dangerouslySetInnerHTML":{"__html":"$2"}}]]}]],null],null]},["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children","logs","children","$4","children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","notFoundStyles":"$undefined","styles":null}],null]},["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children","logs","children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","notFoundStyles":"$undefined","styles":null}],null]},[["$","html",null,{"lang":"ko","children":[["$","head",null,{"children":[["$","link",null,{"rel":"preconnect","href":"https://fonts.googleapis.com"}],["$","link",null,{"rel":"preconnect","href":"https://fonts.gstatic.com","crossOrigin":"anonymous"}],["$","link",null,{"href":"https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap","rel":"stylesheet"}]]}],["$","body",null,{"children":[["$","div",null,{"className":"grain","aria-hidden":"true"}],["$","$L6",null,{"projects":[{"name":"Arte Project Team","logs":[{"slug":"2026-06-16-리비-시스템","title":"리비 시스템 — 다중로봇·UI·인식 종합 정리","date":"2026-06-16"},{"slug":"2026-06-15-libi-project-topic","title":"프로젝트-주제선정","date":"2026-06-15"},{"slug":"2026-06-14-yolo-vs-ocr","title":"YOLO vs OCR — 언제 같이 쓰나","date":"2026-06-14"}]},{"name":"ROS2","logs":[{"slug":"2026-06-15-map-pgm-to-gazebo","title":"map.pgm_To_Gazebo","date":"2026-06-15"},{"slug":"2026-06-15-ros2-communication-types","title":"ros2-communication-types","date":"2026-06-15"},{"slug":"2026-06-15-ros2-dds","title":"ros2-DDS","date":"2026-06-15"},{"slug":"2026-06-15-ros2-namespace","title":"ros2-namespace","date":"2026-06-15"}]},{"name":"Database","logs":[{"slug":"2026-06-15-database-basics","title":"database-basics","date":"2026-06-15"}]},{"name":"Nav2","logs":[{"slug":"2026-06-16-amcl","title":"AMCL 정리 — 파티클로 내 위치 찾기 (Adaptive Monte Carlo Localization)","date":"2026-06-16"},{"slug":"2026-06-16-bt-navigator","title":"Nav2 BT Navigator 완전 정복 — 그리고 우리는 왜 NavigateToPose를 골랐나","date":"2026-06-16"},{"slug":"2026-06-16-coordinate-transform","title":"좌표계 변환 정리 — 회전·이동·동차변환과 쿼터니언","date":"2026-06-16"},{"slug":"2026-06-16-nav2-pkg","title":"Nav2 PKG 총정리 — 아키텍처·서버별 설정·Python 제어","date":"2026-06-16"},{"slug":"2026-06-16-nav2-planner-controller-plugins","title":"Nav2 Planner·Controller 플러그인 심층 분석 — 종류·작동원리·장단점","date":"2026-06-16"},{"slug":"2026-06-16-odometry","title":"Odometry 정리 — 시작점 기준 상대 위치 추정","date":"2026-06-16"},{"slug":"2026-06-16-slam","title":"SLAM 정리 — 위치추정과 지도작성을 동시에","date":"2026-06-16"},{"slug":"2026-06-16-tf","title":"TF 정리 — ROS2의 좌표 프레임 변환 시스템 (tf2)","date":"2026-06-16"}]},{"name":"study","logs":[{"slug":"2026-06-16-filter","title":"필터 총정리 — 정의 · 동작원리 · 사용용도","date":"2026-06-16"},{"slug":"2026-06-16-pid-controller","title":"PID 제어기 정리 — 이론 + gogoping 적용 분석","date":"2026-06-16"},{"slug":"2026-06-14-mediapipe","title":"MediaPipe 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-ncnn","title":"NCNN 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-ocr","title":"OCR 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-yolo","title":"YOLO 학습 노트","date":"2026-06-14"}]},{"name":"개발환경","logs":[{"slug":"2026-06-16-vnc-viewer","title":"VNC Viewer 설치 — 원격 GUI 접속 도구","date":"2026-06-16"}]}],"children":["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":"404"}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],"notFoundStyles":[],"styles":null}]}]]}]]}],null],null],[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/css/71ba6e220d0e3e6a.css","precedence":"next","crossOrigin":"$undefined"}]],[null,"$L7"]]]]]
+7:[["$","meta","0",{"name":"viewport","content":"width=device-width, initial-scale=1"}],["$","meta","1",{"charSet":"utf-8"}],["$","title","2",{"children":"log — 개발 기록"}],["$","meta","3",{"name":"description","content":"마크다운으로 쓰는 개발 기록"}]]
+1:null

@@ -1,0 +1,150 @@
+3:I[9275,[],""]
+5:I[1343,[],""]
+6:I[30,["231","static/chunks/231-87925b9c7247c60f.js","185","static/chunks/app/layout-b98a45a9fe68ce50.js"],"default"]
+2:T18de,<h1>SLAM 정리 — 위치추정과 지도작성을 동시에</h1>
+<blockquote>
+<p><strong>SLAM이란 동시적으로 위치를 추정하고 지도를 작성하는 기술이다.</strong>
+(Simultaneous Localization and Mapping / 출처: SMG0317-SLAM 교육자료 + ROS2 개발자 보강)
+흐름: <strong>정의 → 닭과 달걀 문제 → 작동 6단계 → 종류 → 3대 난제 → Localization과의 관계</strong></p>
+</blockquote>
+<hr>
+<h2>Part 0. 한 줄 정의</h2>
+<p>로봇이 주어진 공간에서 주변 환경을 인식하고 <strong>스스로 위치를 파악함과 동시에</strong> 지도를 만들어가는 기술. 현재 어디 있는지 정확히 파악하며, 이동하면서 주변 환경의 지도를 구축하는 것.</p>
+<blockquote>
+<p>로봇이 <strong>스스로 알아서 움직이려면</strong> SLAM이 필요하다 (지도가 없는 미지의 공간에서).</p>
+</blockquote>
+<hr>
+<h2>Part 1. 왜 어려운가 — &quot;닭과 달걀&quot; 문제</h2>
+<pre><code>정확한 지도를 만들려면  →  내 위치를 정확히 알아야 함
+내 위치를 정확히 알려면  →  정확한 지도가 있어야 함
+</code></pre>
+<p>둘 다 모르는 상태에서 <strong>둘을 동시에</strong> 풀어야 한다. 이게 SLAM이 어려운 본질이다.</p>
+<hr>
+<h2>Part 2. SLAM 작동 원리 (6단계)</h2>
+<ol>
+<li><strong>초기화</strong>: 시작 위치에서 센서 데이터를 수집하고 초기 지도를 생성.</li>
+<li><strong>데이터 획득</strong>: 이동하면서 센서 데이터를 지속적으로 수집.</li>
+<li><strong>데이터 연관 (Data Association)</strong>: 현재 데이터와 이전 데이터를 비교해 <strong>특징점을 매칭</strong>하고 이동량을 계산.</li>
+<li><strong>지도 업데이트</strong>: 계산된 이동량을 기반으로 지도를 업데이트.</li>
+<li><strong>위치 추정</strong>: 업데이트된 지도와 센서 데이터로 현재 위치를 추정.</li>
+<li><strong>반복</strong>: 3~5단계를 반복하여 지도를 점차 완성하고 정확한 위치 추정을 수행.</li>
+</ol>
+<blockquote>
+<p>3↔5가 서로를 보정하며 도는 게 SLAM의 핵심 루프. ([[2026-06-16-odometry]]가 이동량의 초기 추정을 제공)</p>
+</blockquote>
+<hr>
+<h2>Part 3. SLAM의 종류</h2>
+<table>
+<thead>
+<tr>
+<th>종류</th>
+<th>센서</th>
+<th>차원</th>
+<th>장점</th>
+<th>단점</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Lidar SLAM</strong></td>
+<td>레이저 센서</td>
+<td>2D/3D</td>
+<td>정확도 높음</td>
+<td>비용 높음</td>
+</tr>
+<tr>
+<td><strong>Visual SLAM</strong></td>
+<td>카메라</td>
+<td>(주로) 단안/스테레오</td>
+<td>비용 저렴</td>
+<td>조명 변화·텍스처에 성능 저하</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>ROS2 실무: 2D는 <strong><code>slam_toolbox</code></strong>(Lidar 기반)가 표준. Visual SLAM은 ORB-SLAM3, RTAB-Map 등.</p>
+</blockquote>
+<hr>
+<h2>Part 4. SLAM의 3대 난제와 해결 방향</h2>
+<table>
+<thead>
+<tr>
+<th>난제</th>
+<th>내용</th>
+<th>해결</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>데이터 연관 문제</strong></td>
+<td>특징점 추출·매칭 과정의 오류가 지도 정확도에 영향</td>
+<td>강건한 특징점, 이상치 제거(RANSAC)</td>
+</tr>
+<tr>
+<td><strong>루프 클로저 (Loop Closure)</strong></td>
+<td>처음 방문했던 장소로 <strong>다시 돌아왔을 때</strong>, 누적된 드리프트로 이전 지도와 불일치 → 이를 해소</td>
+<td>&quot;여기 와봤다&quot;를 인식해 그래프 전체를 보정</td>
+</tr>
+<tr>
+<td><strong>실시간 처리</strong></td>
+<td>많은 센서 데이터를 실시간 처리 → 높은 연산 능력 필요</td>
+<td>front-end(추적)/back-end(최적화) 분리</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p><strong>루프 클로저</strong>가 SLAM의 꽃: 한 바퀴 돌아 출발점을 다시 보면, 그동안 쌓인 오도메트리 드리프트를 한 번에 펴서 지도를 닫는다. (Graph SLAM의 pose-graph 최적화)</p>
+</blockquote>
+<hr>
+<h2>Part 5. SLAM vs Localization — 헷갈리지 말 것</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><strong>SLAM</strong></th>
+<th><strong>Localization (AMCL)</strong></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>지도</td>
+<td><strong>없음 → 만든다</strong></td>
+<td><strong>이미 있음</strong></td>
+</tr>
+<tr>
+<td>푸는 것</td>
+<td>지도 + 위치 동시</td>
+<td>위치만</td>
+</tr>
+<tr>
+<td>ROS2 도구</td>
+<td><code>slam_toolbox</code></td>
+<td><code>nav2_amcl</code></td>
+</tr>
+<tr>
+<td>시점</td>
+<td>맵 구축 단계 (1회)</td>
+<td>운영 중 매번</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>보통 워크플로: <strong>① SLAM으로 지도 한번 만들고(<code>.pgm</code>+<code>.yaml</code> 저장) → ② 그 지도로 AMCL을 돌려 매번 위치추정.</strong> 자세한 AMCL은 [[2026-06-16-amcl]] 참고.</p>
+</blockquote>
+<hr>
+<h2>Part 6. ROS2 개발자 보강</h2>
+<ul>
+<li><strong>출력물</strong>: <code>map_saver_cli</code>로 <code>map.pgm</code>(점유격자 이미지) + <code>map.yaml</code>(해상도·원점) 저장 → Nav2 <code>map_server</code>가 로드 ([[2026-06-16-nav2-pkg]]).</li>
+<li><strong>점유 격자(Occupancy Grid)</strong>: 각 셀이 점유(100)/비점유(0)/미지(-1) 확률. <code>nav_msgs/OccupancyGrid</code>.</li>
+<li><strong>필요 입력</strong>: LaserScan(<code>/scan</code>) + Odometry(<code>/odom</code>) + TF(<code>odom→base_link</code>). → [[2026-06-16-tf]]</li>
+<li><strong>백엔드</strong>: 현대 SLAM은 대부분 <strong>Graph SLAM</strong>(pose-graph + loop closure 최적화). 파티클 기반(gmapping)은 구식.</li>
+</ul>
+<hr>
+<h2>한 줄 요약</h2>
+<blockquote>
+<p><strong>SLAM은 지도도 없고 위치도 모르는 상태에서 둘을 동시에 푸는 기술이다.</strong> 이동량을 추정(오도메트리)하고 특징점을 매칭하며 지도를 키우다, <strong>루프 클로저</strong>로 누적 드리프트를 펴서 일관된 지도를 완성한다. 지도가 완성되면 그 지도로 AMCL이 매번 위치추정을 한다 — <strong>SLAM은 지도 만들기, AMCL은 만든 지도에서 길찾기.</strong></p>
+</blockquote>
+<hr>
+<h2>참고자료</h2>
+<ul>
+<li>SMG0317-SLAM 교육자료</li>
+<li>관련 노트: [[2026-06-16-amcl]] · [[2026-06-16-odometry]] · [[2026-06-16-tf]] · [[2026-06-16-nav2-pkg]]</li>
+</ul>
+4:["slug","2026-06-16-slam","d"]
+0:["3OAE3lecaUJF5TvcDIyhn",[[["",{"children":["logs",{"children":[["slug","2026-06-16-slam","d"],{"children":["__PAGE__?{\"slug\":\"2026-06-16-slam\"}",{}]}]}]},"$undefined","$undefined",true],["",{"children":["logs",{"children":[["slug","2026-06-16-slam","d"],{"children":["__PAGE__",{},[["$L1",["$","article",null,{"className":"view","children":[["$","div",null,{"className":"doc__date","children":"2026. 06. 16"}],["$","h1",null,{"className":"doc__title","children":"SLAM 정리 — 위치추정과 지도작성을 동시에"}],["$","div",null,{"className":"doc__meta","children":[["$","span",null,{"className":"chip","children":"Nav2"}],[["$","span","SLAM",{"className":"tagword","children":["#","SLAM"]}],["$","span","지도작성",{"className":"tagword","children":["#","지도작성"]}],["$","span","Localization",{"className":"tagword","children":["#","Localization"]}],["$","span","LidarSLAM",{"className":"tagword","children":["#","LidarSLAM"]}],["$","span","VisualSLAM",{"className":"tagword","children":["#","VisualSLAM"]}],["$","span","loopclosure",{"className":"tagword","children":["#","loopclosure"]}]]]}],["$","div",null,{"className":"prose","dangerouslySetInnerHTML":{"__html":"$2"}}]]}]],null],null]},["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children","logs","children","$4","children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","notFoundStyles":"$undefined","styles":null}],null]},["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children","logs","children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","notFoundStyles":"$undefined","styles":null}],null]},[["$","html",null,{"lang":"ko","children":[["$","head",null,{"children":[["$","link",null,{"rel":"preconnect","href":"https://fonts.googleapis.com"}],["$","link",null,{"rel":"preconnect","href":"https://fonts.gstatic.com","crossOrigin":"anonymous"}],["$","link",null,{"href":"https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap","rel":"stylesheet"}]]}],["$","body",null,{"children":[["$","div",null,{"className":"grain","aria-hidden":"true"}],["$","$L6",null,{"projects":[{"name":"Arte Project Team","logs":[{"slug":"2026-06-16-리비-시스템","title":"리비 시스템 — 다중로봇·UI·인식 종합 정리","date":"2026-06-16"},{"slug":"2026-06-15-libi-project-topic","title":"프로젝트-주제선정","date":"2026-06-15"},{"slug":"2026-06-14-yolo-vs-ocr","title":"YOLO vs OCR — 언제 같이 쓰나","date":"2026-06-14"}]},{"name":"ROS2","logs":[{"slug":"2026-06-15-map-pgm-to-gazebo","title":"map.pgm_To_Gazebo","date":"2026-06-15"},{"slug":"2026-06-15-ros2-communication-types","title":"ros2-communication-types","date":"2026-06-15"},{"slug":"2026-06-15-ros2-dds","title":"ros2-DDS","date":"2026-06-15"},{"slug":"2026-06-15-ros2-namespace","title":"ros2-namespace","date":"2026-06-15"}]},{"name":"Database","logs":[{"slug":"2026-06-15-database-basics","title":"database-basics","date":"2026-06-15"}]},{"name":"Nav2","logs":[{"slug":"2026-06-16-amcl","title":"AMCL 정리 — 파티클로 내 위치 찾기 (Adaptive Monte Carlo Localization)","date":"2026-06-16"},{"slug":"2026-06-16-bt-navigator","title":"Nav2 BT Navigator 완전 정복 — 그리고 우리는 왜 NavigateToPose를 골랐나","date":"2026-06-16"},{"slug":"2026-06-16-coordinate-transform","title":"좌표계 변환 정리 — 회전·이동·동차변환과 쿼터니언","date":"2026-06-16"},{"slug":"2026-06-16-nav2-pkg","title":"Nav2 PKG 총정리 — 아키텍처·서버별 설정·Python 제어","date":"2026-06-16"},{"slug":"2026-06-16-nav2-planner-controller-plugins","title":"Nav2 Planner·Controller 플러그인 심층 분석 — 종류·작동원리·장단점","date":"2026-06-16"},{"slug":"2026-06-16-odometry","title":"Odometry 정리 — 시작점 기준 상대 위치 추정","date":"2026-06-16"},{"slug":"2026-06-16-slam","title":"SLAM 정리 — 위치추정과 지도작성을 동시에","date":"2026-06-16"},{"slug":"2026-06-16-tf","title":"TF 정리 — ROS2의 좌표 프레임 변환 시스템 (tf2)","date":"2026-06-16"}]},{"name":"study","logs":[{"slug":"2026-06-16-filter","title":"필터 총정리 — 정의 · 동작원리 · 사용용도","date":"2026-06-16"},{"slug":"2026-06-16-pid-controller","title":"PID 제어기 정리 — 이론 + gogoping 적용 분석","date":"2026-06-16"},{"slug":"2026-06-14-mediapipe","title":"MediaPipe 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-ncnn","title":"NCNN 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-ocr","title":"OCR 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-yolo","title":"YOLO 학습 노트","date":"2026-06-14"}]},{"name":"개발환경","logs":[{"slug":"2026-06-16-vnc-viewer","title":"VNC Viewer 설치 — 원격 GUI 접속 도구","date":"2026-06-16"}]}],"children":["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":"404"}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],"notFoundStyles":[],"styles":null}]}]]}]]}],null],null],[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/css/71ba6e220d0e3e6a.css","precedence":"next","crossOrigin":"$undefined"}]],[null,"$L7"]]]]]
+7:[["$","meta","0",{"name":"viewport","content":"width=device-width, initial-scale=1"}],["$","meta","1",{"charSet":"utf-8"}],["$","title","2",{"children":"log — 개발 기록"}],["$","meta","3",{"name":"description","content":"마크다운으로 쓰는 개발 기록"}]]
+1:null

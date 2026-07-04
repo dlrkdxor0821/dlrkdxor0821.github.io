@@ -1,0 +1,222 @@
+3:I[9275,[],""]
+5:I[1343,[],""]
+6:I[30,["231","static/chunks/231-87925b9c7247c60f.js","185","static/chunks/app/layout-b98a45a9fe68ce50.js"],"default"]
+2:T2a45,<h1>필터 총정리 — 정의 · 동작원리 · 사용용도</h1>
+<blockquote>
+<p>상태 추정(칼만 계열)부터 전통 신호처리·적응 필터까지 한 장으로.
+흐름: <strong>큰 그림 → 갈래별 정의/원리/용도 → 선택 가이드 → 한 줄 요약</strong></p>
+</blockquote>
+<hr>
+<h2>Part 0. 큰 그림 — &quot;필터&quot;는 두 세계가 섞여 있다</h2>
+<p>&quot;필터&quot;라는 말은 사실 <strong>목적이 다른 두 계열</strong>을 한 단어로 부르는 것이다.</p>
+<table>
+<thead>
+<tr>
+<th>계열</th>
+<th>푸는 문제</th>
+<th>대표</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>상태 추정 (베이지안)</strong></td>
+<td>노이즈 측정에서 숨은 <em>상태</em>(위치·속도)를 추정</td>
+<td>KF, EKF, UKF, Particle</td>
+</tr>
+<tr>
+<td><strong>신호 처리 (주파수)</strong></td>
+<td>신호에서 원하는 <em>주파수 성분</em>만 통과/제거</td>
+<td>Butterworth, Median, EMA</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>핵심 질문: <strong>&quot;동역학 모델이 있나?&quot;</strong>
+있다 → 상태 추정(칼만 계열). 없다·단순 잡음만 → 신호처리 필터.</p>
+</blockquote>
+<hr>
+<h2>Part A. 상태 추정 (베이지안) 필터</h2>
+<p>가정을 <strong>선형→비선형→비가우시안</strong> 순으로 완화하며 발전한다.</p>
+<h3>A-1. 칼만 필터 (KF)</h3>
+<ul>
+<li><strong>정의</strong>: 선형 시스템 + 가우시안 노이즈에서 숨은 상태를 추정하는 <strong>최적 추정기</strong>.</li>
+<li><strong>동작원리</strong>: <code>예측(모델로 다음 상태)</code> → <code>보정(측정으로 수정)</code> 2단계 반복.<pre><code>[예측]  x⁻ = F·x + B·u ,  P⁻ = F·P·Fᵀ + Q
+[보정]  K  = P⁻Hᵀ(HP⁻Hᵀ + R)⁻¹        # 칼만 게인
+        x  = x⁻ + K(z − H·x⁻)
+        P  = (I − K·H)·P⁻
+</code></pre>
+칼만 게인 <code>K</code>가 예측·측정의 불확실성(<code>P</code> vs <code>R</code>)을 비교해 <strong>더 믿을 쪽에 가중</strong>.</li>
+<li><strong>사용용도</strong>: GPS 추적, 센서 융합, 항법, 경제 시계열.</li>
+</ul>
+<h3>A-2. 확장 칼만 필터 (EKF)</h3>
+<ul>
+<li><strong>정의</strong>: 비선형 시스템용 칼만 필터.</li>
+<li><strong>동작원리</strong>: 비선형 함수를 현재 추정점에서 <strong>자코비안(1차 테일러)</strong> 으로 선형화 후 KF 적용.</li>
+<li><strong>사용용도</strong>: 로봇 SLAM, GPS/IMU 융합, 자율주행 위치추정. (널리 쓰이나 강한 비선형엔 발산 위험)</li>
+</ul>
+<h3>A-3. 무향 칼만 필터 (UKF)</h3>
+<ul>
+<li><strong>정의</strong>: 미분 없이 비선형을 다루는 칼만 필터.</li>
+<li><strong>동작원리</strong>: 분포 대표점인 <strong>시그마 포인트</strong> 몇 개를 비선형 함수에 직접 통과시킨 뒤 평균·공분산 복원(Unscented Transform).</li>
+<li><strong>사용용도</strong>: 자코비안 계산이 어렵거나 비선형이 강한 항법·자세 추정.</li>
+</ul>
+<h3>A-4. 파티클 필터 (PF)</h3>
+<ul>
+<li><strong>정의</strong>: 비선형 + <strong>비가우시안·다봉</strong> 분포까지 다루는 몬테카를로 추정기.</li>
+<li><strong>동작원리</strong>: 가능한 상태를 수많은 <strong>파티클(가중 샘플)</strong> 로 표현 → 예측 → 가중치 갱신 → 리샘플링 반복.</li>
+<li><strong>사용용도</strong>: 로봇 전역 위치추정(납치 문제), 다봉 추적, 영상 객체 추적. (비용 큼)</li>
+</ul>
+<h3>A-5. 정보 필터 (Information Filter)</h3>
+<ul>
+<li><strong>정의</strong>: KF를 공분산 <code>P</code> 대신 <strong>정보행렬 <code>P⁻¹</code></strong> 로 표현한 쌍대(dual) 형태.</li>
+<li><strong>동작원리</strong>: 보정이 단순 덧셈이 되어 다수 센서·노드 융합이 쉬움.</li>
+<li><strong>사용용도</strong>: 분산 센서 네트워크, 멀티 로봇 협업 SLAM.</li>
+</ul>
+<hr>
+<h2>Part B. 평활기 (Smoother)</h2>
+<h3>B-1. RTS 평활기 (Rauch–Tung–Striebel)</h3>
+<ul>
+<li><strong>정의</strong>: <strong>미래 데이터까지</strong> 활용해 과거 상태를 다시 추정하는 오프라인 추정기.</li>
+<li><strong>동작원리</strong>: 정방향 KF 실행 후 <strong>역방향으로 한 번 더</strong> 보정(forward–backward).</li>
+<li><strong>사용용도</strong>: 실시간 아닌 후처리(모션 캡처 정제, 궤적 재구성).</li>
+</ul>
+<hr>
+<h2>Part C. 자세 추정용 경량 필터</h2>
+<h3>C-1. 보완 필터 (Complementary Filter)</h3>
+<ul>
+<li><strong>정의</strong>: 주파수 특성이 상보적인 센서를 합치는 단순 필터.</li>
+<li><strong>동작원리</strong>: 한 센서는 저역통과(가속도계), 다른 센서는 고역통과(자이로)로 거른 뒤 가중합.<pre><code>θ = α·(θ + 자이로·dt) + (1−α)·가속도각
+</code></pre>
+</li>
+<li><strong>사용용도</strong>: 드론·IMU 자세(roll/pitch). 가볍고 튜닝 쉬움 → 칼만의 실전 대안.</li>
+</ul>
+<h3>C-2. Madgwick / Mahony 필터</h3>
+<ul>
+<li><strong>정의</strong>: 쿼터니언 기반 IMU/AHRS 자세 추정 표준.</li>
+<li><strong>동작원리</strong>: 자이로 적분 자세를 가속도·지자기 측정으로 경사하강(Madgwick) / PI 보정(Mahony)하여 드리프트 제거.</li>
+<li><strong>사용용도</strong>: 웨어러블, 드론 FC(ArduPilot 등), VR 트래커.</li>
+</ul>
+<hr>
+<h2>Part D. 전통 신호처리 필터 (주파수 선택)</h2>
+<h3>D-1. 이동평균 / 지수가중평균 (MA / EMA)</h3>
+<ul>
+<li><strong>정의</strong>: 가장 단순한 저역통과 평활 필터.</li>
+<li><strong>동작원리</strong>: MA는 최근 N개 평균, EMA는 <code>y = α·x + (1−α)·y_prev</code> 로 과거에 지수 감쇠 가중.</li>
+<li><strong>사용용도</strong>: 빠른 노이즈 제거, 주가 추세선, 임베디드 경량 평활.</li>
+</ul>
+<h3>D-2. Butterworth / Chebyshev / Bessel (IIR)</h3>
+<ul>
+<li><strong>정의</strong>: 특정 대역을 통과/차단하는 디지털·아날로그 필터 설계군.</li>
+<li><strong>동작원리</strong>: 전달함수 극점 배치로 특성 결정 — Butterworth(평탄), Chebyshev(가파름+리플), Bessel(선형 위상).</li>
+<li><strong>사용용도</strong>: 오디오, 생체신호(EEG/ECG), 안티앨리어싱.</li>
+</ul>
+<h3>D-3. FIR 필터</h3>
+<ul>
+<li><strong>정의</strong>: 유한 임펄스 응답, 피드백 없는 항상 안정한 필터.</li>
+<li><strong>동작원리</strong>: 입력과 고정 계수의 합성곱(convolution). 선형 위상 구현 가능.</li>
+<li><strong>사용용도</strong>: 위상 왜곡이 치명적인 통신·오디오.</li>
+</ul>
+<h3>D-4. Notch 필터</h3>
+<ul>
+<li><strong>정의</strong>: 특정 단일 주파수만 제거하는 대역 차단 필터.</li>
+<li><strong>동작원리</strong>: 목표 주파수에 깊은 골(notch)을 형성.</li>
+<li><strong>사용용도</strong>: 60/50Hz 전원 험 제거, 생체신호 노이즈 제거.</li>
+</ul>
+<h3>D-5. Savitzky–Golay</h3>
+<ul>
+<li><strong>정의</strong>: 형태(피크·폭)를 보존하는 평활 필터.</li>
+<li><strong>동작원리</strong>: 슬라이딩 윈도우 안에서 다항식을 최소제곱 피팅해 중앙값을 대체.</li>
+<li><strong>사용용도</strong>: 스펙트럼 분석, 피크가 중요한 과학 데이터.</li>
+</ul>
+<hr>
+<h2>Part E. 비선형 / 통계 필터</h2>
+<h3>E-1. 중앙값 필터 (Median Filter)</h3>
+<ul>
+<li><strong>정의</strong>: 윈도우 내 중앙값으로 대체하는 비선형 필터.</li>
+<li><strong>동작원리</strong>: 평균 대신 정렬 후 중앙값 → 튀는 값(impulse)에 강건, 엣지 보존.</li>
+<li><strong>사용용도</strong>: 소금-후추 노이즈 제거, 센서 outlier 제거, 영상 전처리.</li>
+</ul>
+<h3>E-2. 양방향 필터 (Bilateral Filter)</h3>
+<ul>
+<li><strong>정의</strong>: 엣지를 보존하는 영상 평활 필터.</li>
+<li><strong>동작원리</strong>: 거리(공간) + 화소값 차이(밝기) 두 가중치를 곱해 비슷한 화소만 평균.</li>
+<li><strong>사용용도</strong>: 사진 노이즈 제거, 윤곽 유지 보정.</li>
+</ul>
+<h3>E-3. 위너 필터 (Wiener Filter)</h3>
+<ul>
+<li><strong>정의</strong>: 평균제곱오차(MSE)를 최소화하는 최적 선형 복원 필터.</li>
+<li><strong>동작원리</strong>: 신호·노이즈 전력 스펙트럼 비율로 주파수별 최적 이득 결정.</li>
+<li><strong>사용용도</strong>: 영상 디블러링, 음성 노이즈 제거.</li>
+</ul>
+<hr>
+<h2>Part F. 적응 필터 (Adaptive)</h2>
+<h3>F-1. LMS / RLS</h3>
+<ul>
+<li><strong>정의</strong>: 환경에 맞춰 계수를 스스로 갱신하는 필터.</li>
+<li><strong>동작원리</strong>: 오차를 줄이는 방향으로 계수 업데이트 — LMS는 경사하강(느림·안정), RLS는 최소제곱(빠름·무거움).</li>
+<li><strong>사용용도</strong>: 에코 캔슬링, 능동 소음 제거(ANC), 채널 등화.</li>
+</ul>
+<hr>
+<h2>Part G. 선택 가이드 (가져가실 한 장)</h2>
+<pre><code>동역학 모델 있음 + 선형        → KF
+동역학 모델 있음 + 비선형       → EKF → (자코비안 어려우면) UKF
+비가우시안·다봉(전역 위치추정)  → Particle Filter
+IMU 자세만, 가볍게            → Complementary / Madgwick
+단순 노이즈 평활              → EMA / Moving Average
+피크 보존 평활               → Savitzky–Golay
+튀는 값(outlier) 제거         → Median
+특정 주파수 제거             → Notch / Butterworth
+에코·소음 제거               → LMS / RLS
+실시간 아님(후처리 정밀)       → RTS Smoother
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>상황</th>
+<th>추천</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>선형 모델 + 센서융합</td>
+<td>KF</td>
+</tr>
+<tr>
+<td>비선형 모델</td>
+<td>EKF → UKF</td>
+</tr>
+<tr>
+<td>비가우시안·다봉</td>
+<td>Particle</td>
+</tr>
+<tr>
+<td>IMU 자세(경량)</td>
+<td>Complementary / Madgwick</td>
+</tr>
+<tr>
+<td>단순 평활</td>
+<td>EMA / MA</td>
+</tr>
+<tr>
+<td>피크 보존</td>
+<td>Savitzky–Golay</td>
+</tr>
+<tr>
+<td>outlier 제거</td>
+<td>Median</td>
+</tr>
+<tr>
+<td>주파수 제거</td>
+<td>Notch / Butterworth</td>
+</tr>
+<tr>
+<td>에코·소음</td>
+<td>LMS / RLS</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>한 줄 요약</h2>
+<blockquote>
+<p><strong>&quot;동역학 모델이 있나?&quot;</strong> 가 첫 갈림길이다. 있으면 칼만 계열(선형 KF → 비선형 EKF/UKF → 비가우시안 PF)로 <em>상태</em>를 추정하고, 없으면 신호처리 필터로 <em>주파수</em>를 거른다. 칼만이 항상 정답은 아니며 — IMU 자세처럼 가벼운 곳엔 보완 필터, 튀는 값엔 중앙값 필터처럼 <strong>문제에 맞는 가장 단순한 필터가 정석</strong>이다.</p>
+</blockquote>
+4:["slug","2026-06-16-filter","d"]
+0:["3OAE3lecaUJF5TvcDIyhn",[[["",{"children":["logs",{"children":[["slug","2026-06-16-filter","d"],{"children":["__PAGE__?{\"slug\":\"2026-06-16-filter\"}",{}]}]}]},"$undefined","$undefined",true],["",{"children":["logs",{"children":[["slug","2026-06-16-filter","d"],{"children":["__PAGE__",{},[["$L1",["$","article",null,{"className":"view","children":[["$","div",null,{"className":"doc__date","children":"2026. 06. 16"}],["$","h1",null,{"className":"doc__title","children":"필터 총정리 — 정의 · 동작원리 · 사용용도"}],["$","div",null,{"className":"doc__meta","children":[["$","span",null,{"className":"chip","children":"study"}],[["$","span","칼만필터",{"className":"tagword","children":["#","칼만필터"]}],["$","span","신호처리",{"className":"tagword","children":["#","신호처리"]}],["$","span","상태추정",{"className":"tagword","children":["#","상태추정"]}],["$","span","센서융합",{"className":"tagword","children":["#","센서융합"]}],["$","span","필터",{"className":"tagword","children":["#","필터"]}]]]}],["$","div",null,{"className":"prose","dangerouslySetInnerHTML":{"__html":"$2"}}]]}]],null],null]},["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children","logs","children","$4","children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","notFoundStyles":"$undefined","styles":null}],null]},["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children","logs","children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","notFoundStyles":"$undefined","styles":null}],null]},[["$","html",null,{"lang":"ko","children":[["$","head",null,{"children":[["$","link",null,{"rel":"preconnect","href":"https://fonts.googleapis.com"}],["$","link",null,{"rel":"preconnect","href":"https://fonts.gstatic.com","crossOrigin":"anonymous"}],["$","link",null,{"href":"https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap","rel":"stylesheet"}]]}],["$","body",null,{"children":[["$","div",null,{"className":"grain","aria-hidden":"true"}],["$","$L6",null,{"projects":[{"name":"Arte Project Team","logs":[{"slug":"2026-06-16-리비-시스템","title":"리비 시스템 — 다중로봇·UI·인식 종합 정리","date":"2026-06-16"},{"slug":"2026-06-15-libi-project-topic","title":"프로젝트-주제선정","date":"2026-06-15"},{"slug":"2026-06-14-yolo-vs-ocr","title":"YOLO vs OCR — 언제 같이 쓰나","date":"2026-06-14"}]},{"name":"ROS2","logs":[{"slug":"2026-06-15-map-pgm-to-gazebo","title":"map.pgm_To_Gazebo","date":"2026-06-15"},{"slug":"2026-06-15-ros2-communication-types","title":"ros2-communication-types","date":"2026-06-15"},{"slug":"2026-06-15-ros2-dds","title":"ros2-DDS","date":"2026-06-15"},{"slug":"2026-06-15-ros2-namespace","title":"ros2-namespace","date":"2026-06-15"}]},{"name":"Database","logs":[{"slug":"2026-06-15-database-basics","title":"database-basics","date":"2026-06-15"}]},{"name":"Nav2","logs":[{"slug":"2026-06-16-amcl","title":"AMCL 정리 — 파티클로 내 위치 찾기 (Adaptive Monte Carlo Localization)","date":"2026-06-16"},{"slug":"2026-06-16-bt-navigator","title":"Nav2 BT Navigator 완전 정복 — 그리고 우리는 왜 NavigateToPose를 골랐나","date":"2026-06-16"},{"slug":"2026-06-16-coordinate-transform","title":"좌표계 변환 정리 — 회전·이동·동차변환과 쿼터니언","date":"2026-06-16"},{"slug":"2026-06-16-nav2-pkg","title":"Nav2 PKG 총정리 — 아키텍처·서버별 설정·Python 제어","date":"2026-06-16"},{"slug":"2026-06-16-nav2-planner-controller-plugins","title":"Nav2 Planner·Controller 플러그인 심층 분석 — 종류·작동원리·장단점","date":"2026-06-16"},{"slug":"2026-06-16-odometry","title":"Odometry 정리 — 시작점 기준 상대 위치 추정","date":"2026-06-16"},{"slug":"2026-06-16-slam","title":"SLAM 정리 — 위치추정과 지도작성을 동시에","date":"2026-06-16"},{"slug":"2026-06-16-tf","title":"TF 정리 — ROS2의 좌표 프레임 변환 시스템 (tf2)","date":"2026-06-16"}]},{"name":"study","logs":[{"slug":"2026-06-16-filter","title":"필터 총정리 — 정의 · 동작원리 · 사용용도","date":"2026-06-16"},{"slug":"2026-06-16-pid-controller","title":"PID 제어기 정리 — 이론 + gogoping 적용 분석","date":"2026-06-16"},{"slug":"2026-06-14-mediapipe","title":"MediaPipe 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-ncnn","title":"NCNN 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-ocr","title":"OCR 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-yolo","title":"YOLO 학습 노트","date":"2026-06-14"}]},{"name":"개발환경","logs":[{"slug":"2026-06-16-vnc-viewer","title":"VNC Viewer 설치 — 원격 GUI 접속 도구","date":"2026-06-16"}]}],"children":["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":"404"}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],"notFoundStyles":[],"styles":null}]}]]}]]}],null],null],[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/css/71ba6e220d0e3e6a.css","precedence":"next","crossOrigin":"$undefined"}]],[null,"$L7"]]]]]
+7:[["$","meta","0",{"name":"viewport","content":"width=device-width, initial-scale=1"}],["$","meta","1",{"charSet":"utf-8"}],["$","title","2",{"children":"log — 개발 기록"}],["$","meta","3",{"name":"description","content":"마크다운으로 쓰는 개발 기록"}]]
+1:null

@@ -1,0 +1,59 @@
+3:I[9275,[],""]
+5:I[1343,[],""]
+6:I[30,["231","static/chunks/231-87925b9c7247c60f.js","185","static/chunks/app/layout-b98a45a9fe68ce50.js"],"default"]
+2:T88f,<h1>VNC Viewer 설치 — 원격 GUI 접속 도구</h1>
+<blockquote>
+<p>그저 <strong>GUI를 보고 싶을 때</strong>는 원격 접속을 위한 도구가 필요하다.
+하지만 <strong>초기 설정 등 꼭 필요한 경우에만</strong> 사용하고, 평소엔 <strong>터미널과 VSCode로 SSH 접속해서 개발!</strong></p>
+</blockquote>
+<hr>
+<h2>Part 0. 언제 쓰나 — VNC vs SSH</h2>
+<table>
+<thead>
+<tr>
+<th>상황</th>
+<th>도구</th>
+<th>이유</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>데스크톱 화면·창을 <strong>눈으로 봐야 할 때</strong> (RViz, Gazebo, 초기 네트워크/디스플레이 설정)</td>
+<td><strong>VNC Viewer</strong></td>
+<td>원격지의 GUI 화면을 그대로 미러링</td>
+</tr>
+<tr>
+<td><strong>평소 개발</strong> (코드 편집·빌드·실행·로그 확인)</td>
+<td><strong>터미널 + VSCode (SSH)</strong></td>
+<td>가볍고 빠름, 텍스트 기반이라 네트워크 부담↓</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>핵심: <strong>VNC는 &quot;꼭 GUI가 필요할 때만&quot; 켜는 보조 도구.</strong> 무거우니 상시 사용하지 말고, 일상 개발은 SSH(터미널·VSCode Remote)로 한다.</p>
+</blockquote>
+<hr>
+<h2>Part 1. 설치 (RealVNC Viewer 7.13.1)</h2>
+<pre><code class="language-bash"># 1. 7.13.1 패키지 다운로드
+wget https://downloads.realvnc.com/download/file/viewer.files/VNC-Viewer-7.13.1-Linux-x64.deb
+
+# 2. dpkg를 이용해 설치 진행
+sudo dpkg -i VNC-Viewer-7.13.1-Linux-x64.deb
+</code></pre>
+<blockquote>
+<p>💡 <code>dpkg -i</code> 도중 의존성 오류가 나면 아래로 보충 후 재시도:</p>
+<pre><code class="language-bash">sudo apt-get install -f
+</code></pre>
+</blockquote>
+<hr>
+<h2>한 줄 요약</h2>
+<blockquote>
+<p><strong>VNC Viewer는 원격 GUI를 봐야 할 때만 쓰는 보조 도구</strong>다. <code>wget</code>으로 <code>.deb</code>를 받아 <code>sudo dpkg -i</code>로 설치하고, 초기 설정 같은 꼭 필요한 순간에만 사용한다. <strong>일상 개발은 터미널 + VSCode SSH 접속이 정석.</strong></p>
+</blockquote>
+<hr>
+<h2>참고자료</h2>
+<ul>
+<li>RealVNC 공식 다운로드: downloads.realvnc.com</li>
+</ul>
+4:["slug","2026-06-16-vnc-viewer","d"]
+0:["3OAE3lecaUJF5TvcDIyhn",[[["",{"children":["logs",{"children":[["slug","2026-06-16-vnc-viewer","d"],{"children":["__PAGE__?{\"slug\":\"2026-06-16-vnc-viewer\"}",{}]}]}]},"$undefined","$undefined",true],["",{"children":["logs",{"children":[["slug","2026-06-16-vnc-viewer","d"],{"children":["__PAGE__",{},[["$L1",["$","article",null,{"className":"view","children":[["$","div",null,{"className":"doc__date","children":"2026. 06. 16"}],["$","h1",null,{"className":"doc__title","children":"VNC Viewer 설치 — 원격 GUI 접속 도구"}],["$","div",null,{"className":"doc__meta","children":[["$","span",null,{"className":"chip","children":"개발환경"}],[["$","span","개발환경",{"className":"tagword","children":["#","개발환경"]}],["$","span","VNC",{"className":"tagword","children":["#","VNC"]}],["$","span","RealVNC",{"className":"tagword","children":["#","RealVNC"]}],["$","span","원격접속",{"className":"tagword","children":["#","원격접속"]}],["$","span","개발환경",{"className":"tagword","children":["#","개발환경"]}]]]}],["$","div",null,{"className":"prose","dangerouslySetInnerHTML":{"__html":"$2"}}]]}]],null],null]},["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children","logs","children","$4","children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","notFoundStyles":"$undefined","styles":null}],null]},["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children","logs","children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","notFoundStyles":"$undefined","styles":null}],null]},[["$","html",null,{"lang":"ko","children":[["$","head",null,{"children":[["$","link",null,{"rel":"preconnect","href":"https://fonts.googleapis.com"}],["$","link",null,{"rel":"preconnect","href":"https://fonts.gstatic.com","crossOrigin":"anonymous"}],["$","link",null,{"href":"https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap","rel":"stylesheet"}]]}],["$","body",null,{"children":[["$","div",null,{"className":"grain","aria-hidden":"true"}],["$","$L6",null,{"projects":[{"name":"Arte Project Team","logs":[{"slug":"2026-06-16-리비-시스템","title":"리비 시스템 — 다중로봇·UI·인식 종합 정리","date":"2026-06-16"},{"slug":"2026-06-15-libi-project-topic","title":"프로젝트-주제선정","date":"2026-06-15"},{"slug":"2026-06-14-yolo-vs-ocr","title":"YOLO vs OCR — 언제 같이 쓰나","date":"2026-06-14"}]},{"name":"ROS2","logs":[{"slug":"2026-06-15-map-pgm-to-gazebo","title":"map.pgm_To_Gazebo","date":"2026-06-15"},{"slug":"2026-06-15-ros2-communication-types","title":"ros2-communication-types","date":"2026-06-15"},{"slug":"2026-06-15-ros2-dds","title":"ros2-DDS","date":"2026-06-15"},{"slug":"2026-06-15-ros2-namespace","title":"ros2-namespace","date":"2026-06-15"}]},{"name":"Database","logs":[{"slug":"2026-06-15-database-basics","title":"database-basics","date":"2026-06-15"}]},{"name":"Nav2","logs":[{"slug":"2026-06-16-amcl","title":"AMCL 정리 — 파티클로 내 위치 찾기 (Adaptive Monte Carlo Localization)","date":"2026-06-16"},{"slug":"2026-06-16-bt-navigator","title":"Nav2 BT Navigator 완전 정복 — 그리고 우리는 왜 NavigateToPose를 골랐나","date":"2026-06-16"},{"slug":"2026-06-16-coordinate-transform","title":"좌표계 변환 정리 — 회전·이동·동차변환과 쿼터니언","date":"2026-06-16"},{"slug":"2026-06-16-nav2-pkg","title":"Nav2 PKG 총정리 — 아키텍처·서버별 설정·Python 제어","date":"2026-06-16"},{"slug":"2026-06-16-nav2-planner-controller-plugins","title":"Nav2 Planner·Controller 플러그인 심층 분석 — 종류·작동원리·장단점","date":"2026-06-16"},{"slug":"2026-06-16-odometry","title":"Odometry 정리 — 시작점 기준 상대 위치 추정","date":"2026-06-16"},{"slug":"2026-06-16-slam","title":"SLAM 정리 — 위치추정과 지도작성을 동시에","date":"2026-06-16"},{"slug":"2026-06-16-tf","title":"TF 정리 — ROS2의 좌표 프레임 변환 시스템 (tf2)","date":"2026-06-16"}]},{"name":"study","logs":[{"slug":"2026-06-16-filter","title":"필터 총정리 — 정의 · 동작원리 · 사용용도","date":"2026-06-16"},{"slug":"2026-06-16-pid-controller","title":"PID 제어기 정리 — 이론 + gogoping 적용 분석","date":"2026-06-16"},{"slug":"2026-06-14-mediapipe","title":"MediaPipe 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-ncnn","title":"NCNN 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-ocr","title":"OCR 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-yolo","title":"YOLO 학습 노트","date":"2026-06-14"}]},{"name":"개발환경","logs":[{"slug":"2026-06-16-vnc-viewer","title":"VNC Viewer 설치 — 원격 GUI 접속 도구","date":"2026-06-16"}]}],"children":["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":"404"}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],"notFoundStyles":[],"styles":null}]}]]}]]}],null],null],[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/css/71ba6e220d0e3e6a.css","precedence":"next","crossOrigin":"$undefined"}]],[null,"$L7"]]]]]
+7:[["$","meta","0",{"name":"viewport","content":"width=device-width, initial-scale=1"}],["$","meta","1",{"charSet":"utf-8"}],["$","title","2",{"children":"log — 개발 기록"}],["$","meta","3",{"name":"description","content":"마크다운으로 쓰는 개발 기록"}]]
+1:null

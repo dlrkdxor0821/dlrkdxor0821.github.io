@@ -1,0 +1,130 @@
+3:I[9275,[],""]
+5:I[1343,[],""]
+6:I[30,["231","static/chunks/231-87925b9c7247c60f.js","185","static/chunks/app/layout-b98a45a9fe68ce50.js"],"default"]
+2:T17ba,<h1>TF 정리 — ROS2의 좌표 프레임 변환 시스템 (tf2)</h1>
+<blockquote>
+<p><strong>TF(tf2)는 ROS2에서 여러 좌표 프레임(frame) 사이의 관계를 시간에 따라 추적·변환해주는 시스템이다.</strong>
+흐름: <strong>왜 필요한가 → 프레임 트리 → 누가 무엇을 쏘나 → static vs dynamic → 도구 → Nav2에서의 TF</strong>
+(좌표변환의 <em>수학</em>은 [[2026-06-16-coordinate-transform]], 이 노트는 <em>ROS2 구현</em>)</p>
+</blockquote>
+<hr>
+<h2>Part 0. 왜 TF가 필요한가</h2>
+<p>로봇엔 좌표계가 많다 — 지도(<code>map</code>), 로봇 몸체(<code>base_link</code>), LiDAR(<code>laser</code>), 카메라(<code>camera</code>), 바퀴…
+LiDAR가 <em>&quot;내 앞 2m에 벽&quot;</em> 이라고 하면, 그걸 <em>&quot;지도상 (5.3, 1.2) 위치의 벽&quot;</em> 으로 바꿔야 쓸 수 있다.</p>
+<blockquote>
+<p>TF = <strong>&quot;센서가 본 좌표를 다른 기준 좌표로 자동 환산해주는 시스템.&quot;</strong> 각 프레임 사이 변환을 모아 트리로 관리하고, <em>&quot;laser→map 변환 줘&quot;</em> 하면 중간 경로를 곱해서 답해준다.</p>
+</blockquote>
+<hr>
+<h2>Part 1. TF 트리 (Transform Tree)</h2>
+<p>프레임들은 <strong>하나의 트리</strong>로 연결된다 (사이클 없음, 각 프레임은 부모 하나):</p>
+<pre><code>map  →  odom  →  base_link  →  laser
+                          └─→  camera
+                          └─→  imu
+</code></pre>
+<ul>
+<li>각 화살표 = 부모→자식 <strong>변환(translation + rotation)</strong></li>
+<li>임의의 두 프레임 변환은 트리 경로를 따라 변환을 <strong>곱해서</strong> 계산</li>
+<li>map↔odom↔base_link의 의미는 [[2026-06-16-odometry]] 참고 (REP-105 표준)</li>
+</ul>
+<hr>
+<h2>Part 2. 누가 무엇을 발행(broadcast)하나 — 중요!</h2>
+<p>TF 트리는 <strong>여러 노드가 각자 한 구간씩</strong> 책임진다:</p>
+<table>
+<thead>
+<tr>
+<th>변환 구간</th>
+<th>누가 발행</th>
+<th>성격</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>map → odom</code></td>
+<td><strong>AMCL</strong> (또는 SLAM)</td>
+<td>드리프트 보정분. 불연속(점프 가능)</td>
+</tr>
+<tr>
+<td><code>odom → base_link</code></td>
+<td>바퀴 컨트롤러 / <code>ros2_control</code> / <code>robot_localization</code></td>
+<td><strong>오도메트리</strong>. 연속적</td>
+</tr>
+<tr>
+<td><code>base_link → laser/camera/...</code></td>
+<td><code>robot_state_publisher</code> (URDF 기반)</td>
+<td>보통 고정(static)</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>핵심: <strong>AMCL은 <code>map→base_link</code>를 직접 쏘지 않는다.</strong> 이미 누군가 <code>odom→base_link</code>를 쏘고 있으니, AMCL은 그 위에 얹는 <strong><code>map→odom</code>(보정분)만</strong> 발행한다. 그래야 트리에서 각 프레임의 부모가 하나로 유지된다. ([[2026-06-16-amcl]])</p>
+</blockquote>
+<hr>
+<h2>Part 3. Static vs Dynamic Transform</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Static TF</th>
+<th>Dynamic TF</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>토픽</td>
+<td><code>/tf_static</code></td>
+<td><code>/tf</code></td>
+</tr>
+<tr>
+<td>언제</td>
+<td>변하지 않는 관계 (로봇에 볼트로 고정된 센서)</td>
+<td>시간에 따라 변함 (로봇 이동, 관절)</td>
+</tr>
+<tr>
+<td>발행</td>
+<td>한 번(latched)</td>
+<td>계속</td>
+</tr>
+<tr>
+<td>도구</td>
+<td><code>static_transform_publisher</code></td>
+<td>TransformBroadcaster</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>Nav2에서 컨테이너 안 노드들이 <code>/tf</code>, <code>/tf_static</code>을 <strong>remap</strong>으로 공유하는 이유가 이것 ([[2026-06-16-nav2-pkg]]의 composition).</p>
+</blockquote>
+<hr>
+<h2>Part 4. transform_tolerance — 시간 동기화</h2>
+<p>TF는 <strong>시간 스탬프</strong>가 핵심이다. <em>&quot;0.1초 전 시점의 laser→map 변환&quot;</em> 처럼 과거 특정 시각의 변환을 묻는다.</p>
+<ul>
+<li><strong><code>transform_tolerance</code></strong>: TF가 살짝 늦게 와도 허용하는 시간 오차 (네트워크 지연 대응). 너무 작으면 <em>&quot;extrapolation into the future&quot;</em> 에러로 데이터를 버린다.</li>
+<li>흔한 버그: 노드 간 <code>use_sim_time</code> 불일치 → TF 시간이 안 맞아 &quot;could not transform&quot; 에러.</li>
+</ul>
+<hr>
+<h2>Part 5. ROS2 개발자 도구 (실무 필수)</h2>
+<pre><code class="language-bash"># 프레임 트리를 PDF로 시각화
+ros2 run tf2_tools view_frames
+
+# 두 프레임 사이 실시간 변환 출력
+ros2 run tf2_ros tf2_echo map base_link
+
+# 특정 변환을 수동 발행 (테스트용)
+ros2 run tf2_ros static_transform_publisher 0 0 0 0 0 0 base_link laser
+</code></pre>
+<ul>
+<li><strong>API</strong>: C++ <code>tf2_ros::TransformBroadcaster</code> / <code>TransformListener</code>, Python <code>tf2_ros</code>.</li>
+<li><strong>메시지</strong>: <code>geometry_msgs/TransformStamped</code> (header.frame_id=부모, child_frame_id=자식).</li>
+<li><strong>흔한 증상 진단</strong>: RViz에서 &quot;No transform from [X] to [map]&quot; → 트리가 끊김(누가 그 구간을 안 쏨) 또는 시간 불일치.</li>
+</ul>
+<hr>
+<h2>한 줄 요약</h2>
+<blockquote>
+<p><strong>TF(tf2)는 로봇의 모든 좌표 프레임을 하나의 시간 인식 트리로 묶어, &quot;이 센서 좌표를 저 기준으로 바꿔줘&quot;를 자동 처리하는 시스템이다.</strong> 트리는 여러 노드가 한 구간씩 나눠 발행하며(<code>odom→base_link</code>는 오도메트리, <code>map→odom</code>은 AMCL), <code>view_frames</code>·<code>tf2_echo</code>로 디버깅한다. 좌표변환의 수학적 원리는 [[2026-06-16-coordinate-transform]]에서.</p>
+</blockquote>
+<hr>
+<h2>참고자료</h2>
+<ul>
+<li>ROS2 <code>tf2</code> / REP-103, REP-105 좌표계 표준</li>
+<li>관련 노트: [[2026-06-16-coordinate-transform]] · [[2026-06-16-odometry]] · [[2026-06-16-amcl]] · [[2026-06-16-nav2-pkg]]</li>
+</ul>
+4:["slug","2026-06-16-tf","d"]
+0:["3OAE3lecaUJF5TvcDIyhn",[[["",{"children":["logs",{"children":[["slug","2026-06-16-tf","d"],{"children":["__PAGE__?{\"slug\":\"2026-06-16-tf\"}",{}]}]}]},"$undefined","$undefined",true],["",{"children":["logs",{"children":[["slug","2026-06-16-tf","d"],{"children":["__PAGE__",{},[["$L1",["$","article",null,{"className":"view","children":[["$","div",null,{"className":"doc__date","children":"2026. 06. 16"}],["$","h1",null,{"className":"doc__title","children":"TF 정리 — ROS2의 좌표 프레임 변환 시스템 (tf2)"}],["$","div",null,{"className":"doc__meta","children":[["$","span",null,{"className":"chip","children":"Nav2"}],[["$","span","TF",{"className":"tagword","children":["#","TF"]}],["$","span","tf2",{"className":"tagword","children":["#","tf2"]}],["$","span","좌표계",{"className":"tagword","children":["#","좌표계"]}],["$","span","frame",{"className":"tagword","children":["#","frame"]}],["$","span","transform",{"className":"tagword","children":["#","transform"]}],["$","span","REP105",{"className":"tagword","children":["#","REP105"]}]]]}],["$","div",null,{"className":"prose","dangerouslySetInnerHTML":{"__html":"$2"}}]]}]],null],null]},["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children","logs","children","$4","children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","notFoundStyles":"$undefined","styles":null}],null]},["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children","logs","children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","notFoundStyles":"$undefined","styles":null}],null]},[["$","html",null,{"lang":"ko","children":[["$","head",null,{"children":[["$","link",null,{"rel":"preconnect","href":"https://fonts.googleapis.com"}],["$","link",null,{"rel":"preconnect","href":"https://fonts.gstatic.com","crossOrigin":"anonymous"}],["$","link",null,{"href":"https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap","rel":"stylesheet"}]]}],["$","body",null,{"children":[["$","div",null,{"className":"grain","aria-hidden":"true"}],["$","$L6",null,{"projects":[{"name":"Arte Project Team","logs":[{"slug":"2026-06-16-리비-시스템","title":"리비 시스템 — 다중로봇·UI·인식 종합 정리","date":"2026-06-16"},{"slug":"2026-06-15-libi-project-topic","title":"프로젝트-주제선정","date":"2026-06-15"},{"slug":"2026-06-14-yolo-vs-ocr","title":"YOLO vs OCR — 언제 같이 쓰나","date":"2026-06-14"}]},{"name":"ROS2","logs":[{"slug":"2026-06-15-map-pgm-to-gazebo","title":"map.pgm_To_Gazebo","date":"2026-06-15"},{"slug":"2026-06-15-ros2-communication-types","title":"ros2-communication-types","date":"2026-06-15"},{"slug":"2026-06-15-ros2-dds","title":"ros2-DDS","date":"2026-06-15"},{"slug":"2026-06-15-ros2-namespace","title":"ros2-namespace","date":"2026-06-15"}]},{"name":"Database","logs":[{"slug":"2026-06-15-database-basics","title":"database-basics","date":"2026-06-15"}]},{"name":"Nav2","logs":[{"slug":"2026-06-16-amcl","title":"AMCL 정리 — 파티클로 내 위치 찾기 (Adaptive Monte Carlo Localization)","date":"2026-06-16"},{"slug":"2026-06-16-bt-navigator","title":"Nav2 BT Navigator 완전 정복 — 그리고 우리는 왜 NavigateToPose를 골랐나","date":"2026-06-16"},{"slug":"2026-06-16-coordinate-transform","title":"좌표계 변환 정리 — 회전·이동·동차변환과 쿼터니언","date":"2026-06-16"},{"slug":"2026-06-16-nav2-pkg","title":"Nav2 PKG 총정리 — 아키텍처·서버별 설정·Python 제어","date":"2026-06-16"},{"slug":"2026-06-16-nav2-planner-controller-plugins","title":"Nav2 Planner·Controller 플러그인 심층 분석 — 종류·작동원리·장단점","date":"2026-06-16"},{"slug":"2026-06-16-odometry","title":"Odometry 정리 — 시작점 기준 상대 위치 추정","date":"2026-06-16"},{"slug":"2026-06-16-slam","title":"SLAM 정리 — 위치추정과 지도작성을 동시에","date":"2026-06-16"},{"slug":"2026-06-16-tf","title":"TF 정리 — ROS2의 좌표 프레임 변환 시스템 (tf2)","date":"2026-06-16"}]},{"name":"study","logs":[{"slug":"2026-06-16-filter","title":"필터 총정리 — 정의 · 동작원리 · 사용용도","date":"2026-06-16"},{"slug":"2026-06-16-pid-controller","title":"PID 제어기 정리 — 이론 + gogoping 적용 분석","date":"2026-06-16"},{"slug":"2026-06-14-mediapipe","title":"MediaPipe 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-ncnn","title":"NCNN 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-ocr","title":"OCR 학습 노트","date":"2026-06-14"},{"slug":"2026-06-14-yolo","title":"YOLO 학습 노트","date":"2026-06-14"}]},{"name":"개발환경","logs":[{"slug":"2026-06-16-vnc-viewer","title":"VNC Viewer 설치 — 원격 GUI 접속 도구","date":"2026-06-16"}]}],"children":["$","$L3",null,{"parallelRouterKey":"children","segmentPath":["children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":"404"}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],"notFoundStyles":[],"styles":null}]}]]}]]}],null],null],[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/css/71ba6e220d0e3e6a.css","precedence":"next","crossOrigin":"$undefined"}]],[null,"$L7"]]]]]
+7:[["$","meta","0",{"name":"viewport","content":"width=device-width, initial-scale=1"}],["$","meta","1",{"charSet":"utf-8"}],["$","title","2",{"children":"log — 개발 기록"}],["$","meta","3",{"name":"description","content":"마크다운으로 쓰는 개발 기록"}]]
+1:null
