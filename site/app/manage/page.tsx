@@ -259,20 +259,27 @@ export default function ManagePage() {
   };
 
   const categories = useMemo(
-    () => Array.from(new Set((posts ?? []).map((p) => p.fields.project).filter(Boolean))).sort(),
-    [posts],
+    () =>
+      Array.from(
+        new Set([
+          ...(posts ?? []).map((p) => p.fields.project).filter(Boolean),
+          ...declaredCats.map((c) => c.name),
+        ]),
+      ).sort(),
+    [posts, declaredCats],
   );
 
-  // 기존 카테고리 → 그룹(대분류) 매핑 (최신 글 기준, 없으면 이름 폴백)
+  // 기존 카테고리 → 그룹(대분류) 매핑 (최신 글 기준 > 선언 카테고리 > 이름 폴백)
   const categoryGroupMap = useMemo(() => {
-    const sorted = [...(posts ?? [])].sort((a, b) => (a.fields.date < b.fields.date ? 1 : -1));
     const map: Record<string, CategoryGroup> = {};
+    for (const c of declaredCats) map[c.name] = c.group;
+    const sorted = [...(posts ?? [])].sort((a, b) => (a.fields.date < b.fields.date ? 1 : -1));
     for (const p of sorted) {
-      if (p.fields.project in map) continue;
-      map[p.fields.project] = p.fields.group ?? fallbackGroup(p.fields.project);
+      if (p.fields.group) map[p.fields.project] = p.fields.group;
+      else if (!(p.fields.project in map)) map[p.fields.project] = fallbackGroup(p.fields.project);
     }
     return map;
-  }, [posts]);
+  }, [posts, declaredCats]);
 
   // 실제로 글이 속한 그룹(삭제 불가 판정용)
   const usedGroups = useMemo(
