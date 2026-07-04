@@ -1,0 +1,9 @@
+site/node_modules/
+site/.next/
+site/out/
+site/.env
+site/*.tsbuildinfo
+site/next-env.d.ts
+.superpowers/
+oauth-worker/.wrangler/
+oauth-worker/node_modules/

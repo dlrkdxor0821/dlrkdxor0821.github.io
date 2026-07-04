@@ -1,0 +1,26 @@
+{
+  "name": "development-log",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "next": "14.2.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "gray-matter": "4.0.3",
+    "marked": "12.0.2",
+    "@prismicio/client": "7.3.1"
+  },
+  "devDependencies": {
+    "typescript": "5.4.5",
+    "@types/node": "20.14.2",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "vitest": "1.6.0"
+  }
+}
