@@ -5,11 +5,30 @@ import { marked } from "marked";
 
 export const CONTENT_DIR = path.join(process.cwd(), "content");
 export const GROUPS_FILE = path.join(process.cwd(), "data", "groups.json");
+export const CATEGORIES_FILE = path.join(process.cwd(), "data", "categories.json");
 
 // 그룹은 임의의 문자열 이름(예: "프로젝트", "스터디", "회고"). data/groups.json이 순서·목록의 원본.
 export type CategoryType = string;
 
 export const DEFAULT_GROUPS = ["프로젝트", "스터디"];
+
+// 선언된 카테고리(글이 없어도 항상 표시). data/categories.json이 원본.
+export interface DeclaredCategory {
+  name: string;
+  group: string;
+}
+
+export function getDeclaredCategories(): DeclaredCategory[] {
+  try {
+    const arr = JSON.parse(fs.readFileSync(CATEGORIES_FILE, "utf8"));
+    if (Array.isArray(arr)) {
+      return arr.filter((x) => x && typeof x.name === "string" && typeof x.group === "string");
+    }
+  } catch {
+    /* 파일 없음/파싱 실패 → 빈 목록 */
+  }
+  return [];
+}
 
 export interface PostMeta {
   slug: string;
@@ -122,16 +141,27 @@ export function categoryGroups(dir: string = CONTENT_DIR): Map<string, CategoryT
 }
 
 export function getProjects(dir: string = CONTENT_DIR): ProjectSummary[] {
+  // 항상 표시할(선언된) 카테고리: 하드코딩 DECLARED_PROJECTS + data/categories.json
+  const declaredCats = getDeclaredCategories();
+  const declaredGroupOf = new Map(declaredCats.map((c) => [c.name, c.group]));
+  const alwaysShow: string[] = [];
+  for (const n of [...DECLARED_PROJECTS, ...declaredCats.map((c) => c.name)]) {
+    if (!alwaysShow.includes(n)) alwaysShow.push(n);
+  }
+
   const counts = new Map<string, number>();
-  for (const name of DECLARED_PROJECTS) counts.set(name, 0);
+  for (const name of alwaysShow) counts.set(name, 0);
   for (const post of getAllPosts(dir)) {
     counts.set(post.project, (counts.get(post.project) ?? 0) + 1);
   }
   const groups = categoryGroups(dir);
-  const groupOf = (name: string): CategoryType => groups.get(name) ?? categoryType(name);
-  const declared = DECLARED_PROJECTS.map((name) => ({ name, count: counts.get(name) ?? 0, type: groupOf(name) }));
+  // 그룹 결정: 글 frontmatter > 선언 카테고리 group > 이름 기반 폴백
+  const groupOf = (name: string): CategoryType =>
+    groups.get(name) ?? declaredGroupOf.get(name) ?? categoryType(name);
+
+  const declared = alwaysShow.map((name) => ({ name, count: counts.get(name) ?? 0, type: groupOf(name) }));
   const rest = [...counts.entries()]
-    .filter(([name]) => !DECLARED_PROJECTS.includes(name))
+    .filter(([name]) => !alwaysShow.includes(name))
     .map(([name, count]) => ({ name, count, type: groupOf(name) }))
     .sort((a, b) => a.name.localeCompare(b.name));
   return [...declared, ...rest];

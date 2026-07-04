@@ -787,3 +787,12 @@ a.plist-group__title:hover { color: var(--accent-2); }
 .grouprow__name { flex: 1; min-width: 120px; font-size: 15px; }
 .group-add { display: flex; gap: 8px; margin-top: 20px; max-width: 420px; }
 .group-add .ed-input { flex: 1; }
+
+/* 카테고리 추가 폼 */
+.cat-add { display: flex; gap: 8px; margin-top: 24px; max-width: 560px; flex-wrap: wrap; }
+.cat-add > .ed-input:first-child { flex: 1; min-width: 160px; }
+.cat-add__group { flex: none; width: 130px; }
+
+/* 위험 버튼 (삭제) */
+.ed-btn--danger { color: #d2674a; border-color: rgba(210, 103, 74, 0.4); }
+.ed-btn--danger:hover { background: rgba(210, 103, 74, 0.12); border-color: #d2674a; }

@@ -54,6 +54,8 @@ export default function ManagePage() {
   const [posts, setPosts] = useState<LoadedPost[] | null>(null);
   const [groups, setGroups] = useState<string[]>(DEFAULT_GROUPS);
   const [groupsSha, setGroupsSha] = useState<string | null>(null);
+  const [declaredCats, setDeclaredCats] = useState<{ name: string; group: string }[]>([]);
+  const [catsSha, setCatsSha] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ post: LoadedPost | null; isNew: boolean } | null>(null);
   const [view, setView] = useState<"list" | "categories" | "groups">("list");
   const [loadError, setLoadError] = useState("");
@@ -77,6 +79,14 @@ export default function ManagePage() {
     setGroupsSha(data.sha);
   }, [api]);
 
+  const loadCategories = useCallback(async () => {
+    const res = await api("/api/categories");
+    if (!res.ok) return;
+    const data: { categories: { name: string; group: string }[]; sha: string | null } = await res.json();
+    setDeclaredCats(data.categories);
+    setCatsSha(data.sha);
+  }, [api]);
+
   // 로그인 후: 목록 로드 + URL 의도(new/slug) 처리
   useEffect(() => {
     if (!ready || !loggedIn) return;
@@ -84,6 +94,7 @@ export default function ManagePage() {
     (async () => {
       try {
         await loadGroups();
+        await loadCategories();
         const loaded = await loadPosts();
         if (cancelled) return;
         const params = new URLSearchParams(window.location.search);
@@ -103,7 +114,7 @@ export default function ManagePage() {
     return () => {
       cancelled = true;
     };
-  }, [ready, loggedIn, loadPosts, loadGroups]);
+  }, [ready, loggedIn, loadPosts, loadGroups, loadCategories]);
 
   const uniqueSlug = (base: string, existing: LoadedPost[]): string => {
     const taken = new Set(existing.map((p) => p.slug));
@@ -158,16 +169,24 @@ export default function ManagePage() {
     }
   };
 
-  // 카테고리 이름/그룹 일괄 변경 — 해당 카테고리의 모든 글 frontmatter 수정
+  const saveDeclaredCats = async (cats: { name: string; group: string }[]) => {
+    const res = await api("/api/categories", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ categories: cats, sha: catsSha }),
+    });
+    if (!res.ok) throw new Error(`카테고리 목록 저장 실패 (${res.status})`);
+  };
+
+  // 카테고리 이름/그룹 일괄 변경 — 글 frontmatter + 선언 목록(categories.json) 반영
   const handleCategoryApply = async (
     oldName: string,
     newName: string,
     newGroup: CategoryGroup,
   ) => {
-    const affected = (posts ?? []).filter((p) => p.fields.project === oldName);
-    if (affected.length === 0) return;
     setSaving(true);
     try {
+      const affected = (posts ?? []).filter((p) => p.fields.project === oldName);
       for (const p of affected) {
         const content = buildMarkdown({ ...p.fields, project: newName, group: newGroup });
         const res = await api(`/api/posts/${encodeURIComponent(p.slug)}`, {
@@ -177,8 +196,60 @@ export default function ManagePage() {
         });
         if (!res.ok) throw new Error(`카테고리 변경 실패 (${res.status})`);
       }
+      // 선언된(빈 것 포함) 카테고리면 categories.json도 갱신
+      if (declaredCats.some((c) => c.name === oldName)) {
+        await saveDeclaredCats(
+          declaredCats.map((c) => (c.name === oldName ? { name: newName, group: newGroup } : c)),
+        );
+      }
+      await loadCategories();
       await loadPosts();
-      setToast(`카테고리 반영: ${affected.length}개 글. 잠시 후 사이트에 적용됩니다.`);
+      setToast(`카테고리 반영됐어요. 잠시 후 사이트에 적용됩니다.`);
+      setTimeout(() => setToast(""), 6000);
+    } catch (e) {
+      setToast((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 카테고리 생성 (빈 카테고리 → categories.json에 추가)
+  const handleCategoryCreate = async (name: string, group: string) => {
+    setSaving(true);
+    try {
+      await saveDeclaredCats([...declaredCats, { name, group }]);
+      await loadCategories();
+      setToast(`카테고리 "${name}" 생성됐어요.`);
+      setTimeout(() => setToast(""), 6000);
+    } catch (e) {
+      setToast((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 카테고리 삭제 (글이 있으면 글도 함께 삭제 + 선언 목록에서 제거)
+  const handleCategoryDelete = async (cat: { name: string; count: number }) => {
+    const msg =
+      cat.count > 0
+        ? `"${cat.name}" 카테고리와 그 안의 글 ${cat.count}개를 모두 삭제할까요?`
+        : `"${cat.name}" 카테고리를 삭제할까요?`;
+    if (!window.confirm(msg)) return;
+    setSaving(true);
+    try {
+      const affected = (posts ?? []).filter((p) => p.fields.project === cat.name);
+      for (const p of affected) {
+        const res = await api(`/api/posts/${encodeURIComponent(p.slug)}?sha=${p.sha}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) throw new Error(`글 삭제 실패 (${res.status})`);
+      }
+      if (declaredCats.some((c) => c.name === cat.name)) {
+        await saveDeclaredCats(declaredCats.filter((c) => c.name !== cat.name));
+      }
+      await loadCategories();
+      await loadPosts();
+      setToast(`"${cat.name}" 삭제됐어요.`);
       setTimeout(() => setToast(""), 6000);
     } catch (e) {
       setToast((e as Error).message);
@@ -271,9 +342,12 @@ export default function ManagePage() {
       ) : view === "categories" ? (
         <CategoryManager
           posts={posts ?? []}
+          declaredCategories={declaredCats}
           groups={groups}
           busy={saving}
           onApply={handleCategoryApply}
+          onCreate={handleCategoryCreate}
+          onDelete={handleCategoryDelete}
           onBack={() => setView("list")}
         />
       ) : view === "groups" ? (

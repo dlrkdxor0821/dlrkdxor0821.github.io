@@ -6,6 +6,7 @@ const REPO = "dlrkdxor0821/dlrkdxor0821.github.io";
 const BRANCH = "main";
 const DIR = "site/content";
 const GROUPS_PATH = "site/data/groups.json";
+const CATEGORIES_PATH = "site/data/categories.json";
 const GH_API = "https://api.github.com";
 
 function corsHeaders(request) {
@@ -133,6 +134,36 @@ async function putGroupsFile(env, groups, sha) {
   return (await res.json()).content.sha;
 }
 
+async function getCategoriesFile(env) {
+  const res = await gh(env, `/repos/${REPO}/contents/${encodeURI(CATEGORIES_PATH)}?ref=${BRANCH}`);
+  if (res.status === 404) return { categories: [], sha: null };
+  if (!res.ok) throw new Error(`GitHub ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  let categories = [];
+  try {
+    const parsed = JSON.parse(base64ToUtf8(data.content));
+    if (Array.isArray(parsed)) categories = parsed;
+  } catch (e) {
+    /* keep default */
+  }
+  return { categories, sha: data.sha };
+}
+
+async function putCategoriesFile(env, categories, sha) {
+  const body = {
+    message: "update: categories",
+    content: utf8ToBase64(JSON.stringify(categories, null, 2) + "\n"),
+    branch: BRANCH,
+  };
+  if (sha) body.sha = sha;
+  const res = await gh(env, `/repos/${REPO}/contents/${encodeURI(CATEGORIES_PATH)}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`GitHub ${res.status}: ${await res.text()}`);
+  return (await res.json()).content.sha;
+}
+
 function authed(request, env) {
   return request.headers.get("x-admin-password") === env.ADMIN_PASSWORD;
 }
@@ -163,6 +194,18 @@ export default {
             return json(request, { error: "invalid groups" }, 400);
           }
           const newSha = await putGroupsFile(env, groups, sha);
+          return json(request, { sha: newSha });
+        }
+      }
+
+      // 카테고리 목록 (site/data/categories.json) — 선언된(빈 것 포함) 카테고리
+      if (pathname === "/api/categories") {
+        if (!authed(request, env)) return json(request, { error: "unauthorized" }, 401);
+        if (request.method === "GET") return json(request, await getCategoriesFile(env));
+        if (request.method === "PUT") {
+          const { categories, sha } = await request.json();
+          if (!Array.isArray(categories)) return json(request, { error: "invalid categories" }, 400);
+          const newSha = await putCategoriesFile(env, categories, sha);
           return json(request, { sha: newSha });
         }
       }

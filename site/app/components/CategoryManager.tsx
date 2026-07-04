@@ -5,6 +5,7 @@ import { CategoryGroup } from "@/lib/markdown";
 import { fallbackGroup } from "@/lib/adminConfig";
 import { LoadedPost } from "./PostList";
 
+export type DeclaredCategory = { name: string; group: string };
 type Cat = { name: string; count: number; group: CategoryGroup };
 
 function groupOf(post: LoadedPost): CategoryGroup {
@@ -16,12 +17,14 @@ function CatEditor({
   groups,
   busy,
   onApply,
+  onDelete,
   onCancel,
 }: {
   cat: Cat;
   groups: string[];
   busy: boolean;
   onApply: (oldName: string, newName: string, newGroup: CategoryGroup) => void;
+  onDelete: (cat: Cat) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(cat.name);
@@ -63,24 +66,38 @@ function CatEditor({
           ))}
         </select>
       </div>
+
+      <div className="ed-field">
+        <button type="button" className="ed-btn ed-btn--danger" disabled={busy} onClick={() => onDelete(cat)}>
+          🗑 카테고리 삭제{cat.count > 0 ? ` (글 ${cat.count}개도 함께 삭제)` : ""}
+        </button>
+      </div>
     </div>
   );
 }
 
 export default function CategoryManager({
   posts,
+  declaredCategories,
   groups,
   busy,
   onApply,
+  onCreate,
+  onDelete,
   onBack,
 }: {
   posts: LoadedPost[];
+  declaredCategories: DeclaredCategory[];
   groups: string[];
   busy: boolean;
   onApply: (oldName: string, newName: string, newGroup: CategoryGroup) => void;
+  onCreate: (name: string, group: string) => void;
+  onDelete: (cat: Cat) => void;
   onBack: () => void;
 }) {
   const [editing, setEditing] = useState<Cat | null>(null);
+  const [newName, setNewName] = useState("");
+  const [newGroup, setNewGroup] = useState(groups[0] ?? "");
 
   const cats = useMemo<Cat[]>(() => {
     const sorted = [...posts].sort((a, b) => (a.fields.date < b.fields.date ? 1 : -1));
@@ -90,8 +107,18 @@ export default function CategoryManager({
       if (existing) existing.count += 1;
       else map.set(p.fields.project, { name: p.fields.project, count: 1, group: groupOf(p) });
     }
+    for (const d of declaredCategories) {
+      if (!map.has(d.name)) map.set(d.name, { name: d.name, count: 0, group: d.group });
+    }
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [posts]);
+  }, [posts, declaredCategories]);
+
+  const create = () => {
+    const n = newName.trim();
+    if (!n || cats.some((c) => c.name === n)) return;
+    onCreate(n, newGroup || groups[0] || "");
+    setNewName("");
+  };
 
   if (editing) {
     return (
@@ -99,8 +126,12 @@ export default function CategoryManager({
         cat={editing}
         groups={groups}
         busy={busy}
-        onApply={(oldName, newName, newGroup) => {
-          onApply(oldName, newName, newGroup);
+        onApply={(oldName, newN, newG) => {
+          onApply(oldName, newN, newG);
+          setEditing(null);
+        }}
+        onDelete={(c) => {
+          onDelete(c);
           setEditing(null);
         }}
         onCancel={() => setEditing(null)}
@@ -116,7 +147,7 @@ export default function CategoryManager({
           ← 글 목록
         </button>
       </div>
-      <p className="ed-hint">카테고리를 클릭하면 이름·그룹을 바꿀 수 있어요. 새 카테고리는 글쓰기의 “카테고리” 칸에 새 이름을 입력하면 생겨요.</p>
+      <p className="ed-hint">카테고리를 클릭하면 이름·그룹을 바꾸거나 삭제할 수 있어요.</p>
 
       {cats.length === 0 ? (
         <p className="empty">카테고리가 없어요.</p>
@@ -133,6 +164,30 @@ export default function CategoryManager({
           ))}
         </ul>
       )}
+
+      <div className="cat-add">
+        <input
+          className="ed-input"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && create()}
+          placeholder="새 카테고리 이름"
+        />
+        <select
+          className="ed-input ed-select cat-add__group"
+          value={newGroup}
+          onChange={(e) => setNewGroup(e.target.value)}
+        >
+          {groups.map((g) => (
+            <option key={g} value={g}>
+              {g}
+            </option>
+          ))}
+        </select>
+        <button type="button" className="ed-btn" onClick={create} disabled={busy || !newName.trim()}>
+          ＋ 추가
+        </button>
+      </div>
     </div>
   );
 }
