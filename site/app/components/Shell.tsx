@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Sidebar from "./Sidebar";
 import ThemeToggle from "./ThemeToggle";
 import SearchButton from "./SearchButton";
+import AdminButton from "./AdminButton";
 
 type Item = { slug: string; title: string; date: string; tags: string[] };
 type CategoryType = "project" | "study";
@@ -44,6 +45,7 @@ export default function Shell({
       >
         <span aria-hidden="true">{collapsed ? "»" : "«"}</span>
       </button>
+      <AdminButton />
       <SearchButton />
       <ThemeToggle />
       <Sidebar projects={projects} />
