@@ -36,7 +36,6 @@ export default function Sidebar({ projects, groups }: { projects: Project[]; gro
         {projects.length === 0 && <div className="rail__none">카테고리 없음</div>}
         {groups.map((groupName) => {
           const group = projects.filter((p) => p.type === groupName);
-          if (group.length === 0) return null;
           const href = `/groups/${encodeURIComponent(groupName)}`;
           return (
             <section className="rail__section" key={groupName}>
@@ -46,19 +45,23 @@ export default function Sidebar({ projects, groups }: { projects: Project[]; gro
               >
                 {groupName}
               </Link>
-              {group.map((p) => {
-                const isActiveCategory = pathname === `/projects/${encodeURIComponent(p.name)}`;
-                return (
-                  <Link
-                    key={p.name}
-                    href={`/projects/${encodeURIComponent(p.name)}`}
-                    className={"rail__proj-link" + (isActiveCategory ? " is-active" : "")}
-                  >
-                    <span className="rail__proj-name">{p.name}</span>
-                    <span className="rail__proj-count">{p.logs.length}</span>
-                  </Link>
-                );
-              })}
+              {group.length === 0 ? (
+                <div className="rail__empty">아직 글 없음</div>
+              ) : (
+                group.map((p) => {
+                  const isActiveCategory = pathname === `/projects/${encodeURIComponent(p.name)}`;
+                  return (
+                    <Link
+                      key={p.name}
+                      href={`/projects/${encodeURIComponent(p.name)}`}
+                      className={"rail__proj-link" + (isActiveCategory ? " is-active" : "")}
+                    >
+                      <span className="rail__proj-name">{p.name}</span>
+                      <span className="rail__proj-count">{p.logs.length}</span>
+                    </Link>
+                  );
+                })
+              )}
             </section>
           );
         })}
