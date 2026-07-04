@@ -2,8 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProjects, getGroups } from "@/lib/posts";
 
-export const dynamicParams = false;
-
 export function generateStaticParams() {
   // 설정된 그룹 + 글에서 실제로 쓰인 그룹
   const configured = getGroups();
