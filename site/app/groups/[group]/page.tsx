@@ -12,7 +12,7 @@ export function generateStaticParams() {
 
 export default function GroupPage({ params }: { params: { group: string } }) {
   const group = decodeURIComponent(params.group);
-  const categories = getProjects().filter((c) => c.type === group && c.count > 0);
+  const categories = getProjects().filter((c) => c.type === group);
   if (categories.length === 0 && !getGroups().includes(group)) notFound();
 
   return (

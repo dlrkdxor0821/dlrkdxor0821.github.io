@@ -796,3 +796,7 @@ a.plist-group__title:hover { color: var(--accent-2); }
 /* 위험 버튼 (삭제) */
 .ed-btn--danger { color: #d2674a; border-color: rgba(210, 103, 74, 0.4); }
 .ed-btn--danger:hover { background: rgba(210, 103, 74, 0.12); border-color: #d2674a; }
+
+/* 새 카테고리 직접 입력 */
+.ed-newcat { display: flex; gap: 8px; align-items: center; }
+.ed-newcat .ed-input { flex: 1; }

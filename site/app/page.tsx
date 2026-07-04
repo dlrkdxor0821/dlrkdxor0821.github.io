@@ -12,7 +12,8 @@ export default function Home() {
     );
   }
 
-  const categories = getProjects().filter((c) => c.count > 0);
+  // 선언된 빈 카테고리도 사이드바처럼 홈에 표시 (count 0 포함)
+  const categories = getProjects();
   // groups.json 순서 + 설정에 없지만 실제 쓰인 그룹을 뒤에 덧붙임
   const configured = getGroups();
   const used = categories.map((c) => c.type);

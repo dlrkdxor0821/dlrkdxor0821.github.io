@@ -25,21 +25,25 @@ export default function PostEditor({
 }) {
   const [title, setTitle] = useState(initial.title);
   const [date, setDate] = useState(initial.date);
-  const [project, setProject] = useState(initial.project || "기타");
-  const defaultGroup = initial.group ?? categoryGroups[initial.project || "기타"] ?? groups[0] ?? "스터디";
+  const [project, setProject] = useState(initial.project);
+  const defaultGroup = initial.group ?? categoryGroups[initial.project] ?? groups[0] ?? "스터디";
   const [group, setGroup] = useState<CategoryGroup>(defaultGroup);
-  // 현재 group이 목록에 없으면(예전 값) 목록에 포함해 표시
-  const groupOptions = groups.includes(group) ? groups : [group, ...groups];
+  const [newCatMode, setNewCatMode] = useState(false);
   const [tagsText, setTagsText] = useState(initial.tags.join(", "));
   const [body, setBody] = useState(initial.body);
   const [preview, setPreview] = useState(false);
   const [error, setError] = useState("");
 
-  // 카테고리를 바꿀 때, 이미 존재하는 카테고리면 그 그룹으로 자동 맞춤
-  const onProjectChange = (value: string) => {
-    setProject(value);
-    const known = categoryGroups[value.trim()];
-    if (known) setGroup(known);
+  // 현재 group이 목록에 없으면(예전 값) 목록에 포함해 표시
+  const groupOptions = groups.includes(group) ? groups : [group, ...groups];
+  // 선택한 그룹에 속한 카테고리만 (+ 현재 값이 목록에 없으면 포함)
+  const catsInGroup = categories.filter((c) => categoryGroups[c] === group);
+  const catOptions = project && !catsInGroup.includes(project) ? [project, ...catsInGroup] : catsInGroup;
+
+  // 그룹을 바꾸면, 현재 카테고리가 다른 그룹의 것이면 비운다(직접 입력한 새 것은 유지)
+  const onGroupChange = (g: string) => {
+    setGroup(g);
+    if (!newCatMode && categoryGroups[project] && categoryGroups[project] !== g) setProject("");
   };
 
   const previewHtml = useMemo(
@@ -50,7 +54,7 @@ export default function PostEditor({
   const dirty =
     title !== initial.title ||
     date !== initial.date ||
-    project !== (initial.project || "기타") ||
+    project !== initial.project ||
     group !== defaultGroup ||
     tagsText !== initial.tags.join(", ") ||
     body !== initial.body;
@@ -128,31 +132,61 @@ export default function PostEditor({
           <input className="ed-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
         <div className="ed-field">
-          <label className="ed-label">카테고리</label>
-          <input
-            className="ed-input"
-            list="ed-categories"
-            value={project}
-            onChange={(e) => onProjectChange(e.target.value)}
-            placeholder="예: ROS2 (없으면 새로 생성)"
-          />
-          <datalist id="ed-categories">
-            {categories.map((c) => (
-              <option key={c} value={c} />
+          <label className="ed-label">그룹 (대분류)</label>
+          <select className="ed-input ed-select" value={group} onChange={(e) => onGroupChange(e.target.value)}>
+            {groupOptions.map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
             ))}
-          </datalist>
+          </select>
         </div>
       </div>
 
       <div className="ed-field">
-        <label className="ed-label">그룹 (대분류)</label>
-        <select className="ed-input ed-select" value={group} onChange={(e) => setGroup(e.target.value)}>
-          {groupOptions.map((g) => (
-            <option key={g} value={g}>
-              {g}
-            </option>
-          ))}
-        </select>
+        <label className="ed-label">카테고리 ({group})</label>
+        {newCatMode ? (
+          <div className="ed-newcat">
+            <input
+              className="ed-input"
+              value={project}
+              onChange={(e) => setProject(e.target.value)}
+              placeholder="새 카테고리 이름"
+              autoFocus
+            />
+            <button
+              type="button"
+              className="ed-btn ed-btn--sm"
+              onClick={() => {
+                setNewCatMode(false);
+                setProject("");
+              }}
+            >
+              목록에서 선택
+            </button>
+          </div>
+        ) : (
+          <select
+            className="ed-input ed-select"
+            value={project}
+            onChange={(e) => {
+              if (e.target.value === "__new__") {
+                setNewCatMode(true);
+                setProject("");
+              } else {
+                setProject(e.target.value);
+              }
+            }}
+          >
+            <option value="">카테고리 선택</option>
+            {catOptions.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+            <option value="__new__">＋ 새 카테고리 직접 입력…</option>
+          </select>
+        )}
       </div>
 
       <div className="ed-field">

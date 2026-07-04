@@ -16,7 +16,7 @@ export default function ProjectsPage() {
     <div className="view">
       <h1 className="view__title">전체 카테고리</h1>
       {groups.map((groupName) => {
-        const group = projects.filter((p) => p.type === groupName && p.count > 0);
+        const group = projects.filter((p) => p.type === groupName);
         if (group.length === 0) return null;
         return (
           <section key={groupName} className="plist-group">

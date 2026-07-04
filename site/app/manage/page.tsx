@@ -335,7 +335,7 @@ export default function ManagePage() {
         <PostEditor
           initial={
             editing.isNew
-              ? { title: "", date: today(), project: "기타", tags: [], body: "" }
+              ? { title: "", date: today(), project: "", tags: [], body: "" }
               : editing.post!.fields
           }
           isNew={editing.isNew}

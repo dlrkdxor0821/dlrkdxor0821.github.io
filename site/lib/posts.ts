@@ -4,8 +4,11 @@ import matter from "gray-matter";
 import { marked } from "marked";
 
 export const CONTENT_DIR = path.join(process.cwd(), "content");
-export const GROUPS_FILE = path.join(process.cwd(), "data", "groups.json");
-export const CATEGORIES_FILE = path.join(process.cwd(), "data", "categories.json");
+
+// data 파일은 콘텐츠 디렉터리의 형제(data/)에서 읽는다. 테스트가 FIXTURES를 넘기면 자동 격리됨.
+function dataFile(contentDir: string, name: string): string {
+  return path.join(path.dirname(contentDir), "data", name);
+}
 
 // 그룹은 임의의 문자열 이름(예: "프로젝트", "스터디", "회고"). data/groups.json이 순서·목록의 원본.
 export type CategoryType = string;
@@ -18,9 +21,9 @@ export interface DeclaredCategory {
   group: string;
 }
 
-export function getDeclaredCategories(): DeclaredCategory[] {
+export function getDeclaredCategories(dir: string = CONTENT_DIR): DeclaredCategory[] {
   try {
-    const arr = JSON.parse(fs.readFileSync(CATEGORIES_FILE, "utf8"));
+    const arr = JSON.parse(fs.readFileSync(dataFile(dir, "categories.json"), "utf8"));
     if (Array.isArray(arr)) {
       return arr.filter((x) => x && typeof x.name === "string" && typeof x.group === "string");
     }
@@ -40,9 +43,9 @@ export interface PostMeta {
 }
 
 // data/groups.json에서 그룹 목록(순서 포함)을 읽는다. 없거나 깨졌으면 기본값.
-export function getGroups(): string[] {
+export function getGroups(dir: string = CONTENT_DIR): string[] {
   try {
-    const arr = JSON.parse(fs.readFileSync(GROUPS_FILE, "utf8"));
+    const arr = JSON.parse(fs.readFileSync(dataFile(dir, "groups.json"), "utf8"));
     if (Array.isArray(arr) && arr.length && arr.every((x) => typeof x === "string")) return arr;
   } catch {
     /* 파일 없음/파싱 실패 → 기본값 */
@@ -142,7 +145,7 @@ export function categoryGroups(dir: string = CONTENT_DIR): Map<string, CategoryT
 
 export function getProjects(dir: string = CONTENT_DIR): ProjectSummary[] {
   // 항상 표시할(선언된) 카테고리: 하드코딩 DECLARED_PROJECTS + data/categories.json
-  const declaredCats = getDeclaredCategories();
+  const declaredCats = getDeclaredCategories(dir);
   const declaredGroupOf = new Map(declaredCats.map((c) => [c.name, c.group]));
   const alwaysShow: string[] = [];
   for (const n of [...DECLARED_PROJECTS, ...declaredCats.map((c) => c.name)]) {
