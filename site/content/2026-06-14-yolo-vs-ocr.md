@@ -1,7 +1,8 @@
 ---
 title: YOLO vs OCR — 언제 같이 쓰나
 date: 2026-06-14
-project: Arte Project Team
+project: study
+group: 스터디
 tags:
   - YOLO
   - OCR
