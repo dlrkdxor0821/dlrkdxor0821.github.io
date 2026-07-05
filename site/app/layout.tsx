@@ -26,6 +26,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap"
           rel="stylesheet"
         />
+        <link
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+          rel="stylesheet"
+        />
       </head>
       <body>
         <div className="grain" aria-hidden="true" />
