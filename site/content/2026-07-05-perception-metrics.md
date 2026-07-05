@@ -2,6 +2,7 @@
 title: 인지 모델 평가 지표 분석
 date: 2026-07-05
 project: study
+group: 스터디
 tags:
   - 객체탐지
   - mAP
